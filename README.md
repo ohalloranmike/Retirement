@@ -26,7 +26,14 @@ Alternative (requirements file only):
 python -m pip install -r requirements.txt
 ```
 
-**PyCharm:** Settings → Project → Python Interpreter → select `.venv\Scripts\python.exe`, then use *Install requirements* on `requirements.txt` or run `pip install -e .` in the terminal with the venv active.
+**IDE (Cursor / VS Code):** Open this folder as the workspace root so `.vscode/settings.json` applies. Choose interpreter **`.venv\Scripts\python.exe`**. Entry scripts (`gui.py`, `main.py`, `streamlit_app.py`) **exit** if you run them with system Python.
+
+**Quick launch (always uses .venv):**
+
+```powershell
+.\run-gui.ps1
+.\run-streamlit.ps1
+```
 
 ## Desktop GUI (recommended — standalone)
 

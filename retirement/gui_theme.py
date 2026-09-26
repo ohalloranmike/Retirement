@@ -42,14 +42,19 @@ def apply_theme(root: tk.Tk, theme: str = "dark") -> dict[str, str]:
     if theme not in THEMES:
         theme = "dark"
 
-    import sv_ttk
-
-    sv_ttk.set_theme(theme)
     colors = PALETTE[theme]
-
     root.configure(bg=colors["window"])
 
     style = ttk.Style(root)
+    try:
+        import sv_ttk
+
+        sv_ttk.set_theme(theme)
+    except ImportError:
+        if sys.platform == "win32":
+            style.theme_use("vista")
+        else:
+            style.theme_use("clam")
     style.configure(".", font=FONT_UI)
     style.configure("TLabel", font=FONT_UI)
     style.configure("Muted.TLabel", font=FONT_UI_SMALL, foreground=colors["muted"])

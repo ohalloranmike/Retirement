@@ -10,9 +10,11 @@ from pathlib import Path
 
 from retirement.excel_export import create_workbook, refresh_projection_in_workbook
 from retirement.projection import default_sample_inputs, inputs_from_dict, run_projection
+from retirement.venv_guard import require_project_venv
 
 
 def main(argv: list[str] | None = None) -> int:
+    require_project_venv()
     parser = argparse.ArgumentParser(description="Retirement income & balance planner (v1)")
     parser.add_argument(
         "--excel",

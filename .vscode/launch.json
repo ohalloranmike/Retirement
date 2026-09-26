@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Retirement GUI",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/gui.py",
+      "console": "integratedTerminal",
+      "python": "${workspaceFolder}/.venv/Scripts/python.exe"
+    }
+  ]
+}

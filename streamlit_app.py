@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from retirement.venv_guard import require_project_venv
+
+require_project_venv()
+
 import streamlit as st
 
 from retirement.charts import balance_chart_figure, income_chart_figure

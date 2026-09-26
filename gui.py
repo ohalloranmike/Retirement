@@ -19,6 +19,7 @@ import pandas as pd
 
 from retirement.charts import balance_chart_figure, income_chart_figure
 from retirement.gui_theme import FONT_MONO, apply_theme
+from retirement.venv_guard import require_project_venv
 from retirement.models import RetirementInputs, WithdrawalOrder
 from retirement.projection import default_sample_inputs, run_projection
 from retirement.report import (
@@ -517,6 +518,7 @@ class RetirementPlannerApp(tk.Tk):
 
 
 def main() -> None:
+    require_project_venv()
     app = RetirementPlannerApp()
     app.mainloop()
 
