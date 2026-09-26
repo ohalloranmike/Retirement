@@ -3,8 +3,19 @@
 
 from __future__ import annotations
 
-import tkinter as tk
+import sys
 import webbrowser
+
+try:
+    import tkinter as tk
+except ImportError:
+    sys.stderr.write(
+        "Tkinter is not available for this Python.\n"
+        "On Linux Mint / Ubuntu, install it with:\n"
+        "  sudo apt install python3-tk\n"
+        "Then recreate or reuse .venv and run:  ./run-gui.sh\n"
+    )
+    raise SystemExit(1) from None
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from typing import Any
@@ -633,10 +644,36 @@ class RetirementPlannerApp(ctk.CTk):
         )
 
 
+def _check_desktop_session() -> None:
+    import os
+
+    if sys.platform == "win32":
+        return
+    if os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"):
+        return
+    sys.stderr.write(
+        "No graphical display detected (DISPLAY / WAYLAND_DISPLAY not set).\n"
+        "Run the GUI from a desktop terminal, not over plain SSH without X forwarding.\n"
+        "For a browser UI on Linux, use:  ./run-streamlit.sh\n"
+    )
+    raise SystemExit(1)
+
+
 def main() -> None:
     require_project_venv()
-    app = RetirementPlannerApp()
-    app.mainloop()
+    _check_desktop_session()
+    try:
+        app = RetirementPlannerApp()
+        app.mainloop()
+    except tk.TclError as exc:
+        sys.stderr.write(
+            f"Tkinter could not start the window: {exc}\n\n"
+            "On Linux Mint, try:\n"
+            "  sudo apt install python3-tk\n"
+            "If you use Wayland and the window still fails, try:\n"
+            "  GDK_BACKEND=x11 ./run-gui.sh\n"
+        )
+        raise SystemExit(1) from exc
 
 
 if __name__ == "__main__":

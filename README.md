@@ -39,14 +39,14 @@ python -m pip install -r requirements.txt
 
 Double-click **`run-gui.bat`** (Cmd) if PowerShell script policy blocks `.ps1` files.
 
-**Linux Mint (and other Unix shells):**
+**Linux Mint (and other Unix shells):** See **[docs/linux.md](docs/linux.md)** for `python3-tk`, venv setup, and troubleshooting.
 
 ```bash
-chmod +x run-streamlit.sh   # once
-./run-streamlit.sh
+sudo apt install python3-tk python3-venv   # required for the desktop GUI
+chmod +x run-gui.sh run-streamlit.sh       # once
+./run-gui.sh                               # desktop UI
+./run-streamlit.sh                         # browser UI → http://127.0.0.1:8501
 ```
-
-Open the URL Streamlit prints (**http://127.0.0.1:8501** — use `127.0.0.1`, not a machine hostname). If the runner icon keeps spinning: check the **terminal** for errors, try Chromium/Firefox, and disable VPN/proxy for localhost. After `git pull`, restart with `./run-streamlit.sh`.
 
 ## Desktop GUI (recommended — standalone)
 

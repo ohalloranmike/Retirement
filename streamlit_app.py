@@ -12,9 +12,7 @@ matplotlib.use("Agg")
 import pandas as pd
 import streamlit as st
 
-from retirement.venv_guard import require_project_venv
-
-require_project_venv()
+from retirement.venv_guard import venv_problem_message
 
 from retirement.charts import balance_chart_figure, income_chart_figure
 from retirement.models import RetirementInputs, WithdrawalOrder
@@ -179,6 +177,12 @@ def _inputs_from_sidebar() -> RetirementInputs:
 def main() -> None:
     import matplotlib.pyplot as plt
 
+    venv_msg = venv_problem_message()
+    if venv_msg:
+        st.set_page_config(page_title="Retirement Planner", layout="wide")
+        st.error(venv_msg)
+        st.stop()
+
     st.set_page_config(
         page_title="Retirement Planner",
         page_icon="📊",
@@ -307,24 +311,4 @@ def main() -> None:
             st.components.v1.html(html_text, height=600, scrolling=True)
 
 
-def _launch_cli() -> None:
-    """Re-launch via Streamlit when started as `python streamlit_app.py`."""
-    import subprocess
-    import sys
-    from pathlib import Path
-
-    script = Path(__file__).resolve()
-    print("Launching Streamlit (use ./run-streamlit.sh or: python -m streamlit run streamlit_app.py)")
-    raise SystemExit(subprocess.call([sys.executable, "-m", "streamlit", "run", str(script)]))
-
-
-def _run_app() -> None:
-    from streamlit.runtime.scriptrunner import get_script_run_ctx
-
-    if get_script_run_ctx() is not None:
-        main()
-    elif __name__ == "__main__":
-        _launch_cli()
-
-
-_run_app()
+main()
