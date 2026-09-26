@@ -39,15 +39,6 @@ python -m pip install -r requirements.txt
 
 Double-click **`run-gui.bat`** (Cmd) if PowerShell script policy blocks `.ps1` files.
 
-**Linux Mint (and other Unix shells):** See **[docs/linux.md](docs/linux.md)** for `python3-tk`, venv setup, and troubleshooting.
-
-```bash
-sudo apt install python3-tk python3-venv   # required for the desktop GUI
-chmod +x run-gui.sh run-streamlit.sh       # once
-./run-gui.sh                               # desktop UI
-./run-streamlit.sh                         # browser UI → http://127.0.0.1:8501
-```
-
 ## Desktop GUI (recommended — standalone)
 
 Self-contained Windows/Mac/Linux app (Tkinter, no browser). Enter all options, run the projection, then export Excel, CSV, HTML, charts, or **everything at once**:

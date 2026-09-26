@@ -2,64 +2,17 @@
 
 from __future__ import annotations
 
-from bootstrap_venv import ensure_project_installed, relaunch_with_project_venv
+from retirement.venv_guard import require_project_venv
 
-relaunch_with_project_venv(__file__, streamlit=True)
-ensure_project_installed(__file__, streamlit=True)
-
-import json
-from dataclasses import asdict
-
-import matplotlib
-
-matplotlib.use("Agg")
-
-import pandas as pd
-import streamlit as st
-
-from retirement.venv_guard import venv_problem_message
+require_project_venv()
 
 from retirement.charts import balance_chart_figure, income_chart_figure
 from retirement.models import RetirementInputs, WithdrawalOrder
 from retirement.projection import default_sample_inputs, run_projection
 from retirement.report import build_html_report, report_dataframe, summarize_projection, workbook_bytes
 
-WITHDRAWAL_OPTIONS: list[tuple[str, WithdrawalOrder]] = [
-    ("Taxable → traditional → Roth", WithdrawalOrder.TAXABLE_TRADITIONAL_ROTH),
-    ("Traditional → taxable → Roth", WithdrawalOrder.TRADITIONAL_TAXABLE_ROTH),
-    ("Proportional across accounts", WithdrawalOrder.PROPORTIONAL),
-]
 
-
-def _inputs_cache_key(inputs: RetirementInputs) -> str:
-    data = asdict(inputs)
-    data["withdrawal_order"] = inputs.withdrawal_order.value
-    return json.dumps(data, sort_keys=True)
-
-
-def _inputs_from_key(inputs_key: str) -> RetirementInputs:
-    data = json.loads(inputs_key)
-    data["withdrawal_order"] = WithdrawalOrder(data["withdrawal_order"])
-    return RetirementInputs(**data)
-
-
-@st.cache_data(show_spinner=False)
-def cached_projection(inputs_key: str) -> pd.DataFrame:
-    return run_projection(_inputs_from_key(inputs_key))
-
-
-@st.cache_data(show_spinner="Building Excel workbook…")
-def cached_workbook(inputs_key: str) -> bytes:
-    return workbook_bytes(_inputs_from_key(inputs_key))
-
-
-@st.cache_data(show_spinner="Building HTML report…")
-def cached_html_report(inputs_key: str) -> str:
-    df = cached_projection(inputs_key)
-    return build_html_report(df, _inputs_from_key(inputs_key))
-
-
-def _inputs_from_sidebar() -> RetirementInputs:
+def _inputs_from_sidebar(st) -> RetirementInputs:
     sample = default_sample_inputs()
     with st.sidebar:
         st.header("Your plan")
@@ -69,10 +22,8 @@ def _inputs_from_sidebar() -> RetirementInputs:
                 "Planning start year", 2020, 2100, sample.planning_start_year, step=1
             )
             retirement_age = st.number_input("Retirement age", 50, 80, sample.retirement_age, step=1)
-            life_min = int(retirement_age) + 1
-            life_default = max(life_min, int(sample.life_expectancy_age))
             life_expectancy_age = st.number_input(
-                "Life expectancy (age)", life_min, 110, life_default, step=1
+                "Life expectancy (age)", retirement_age + 1, 110, sample.life_expectancy_age, step=1
             )
 
         with st.expander("Account balances"):
@@ -139,13 +90,16 @@ def _inputs_from_sidebar() -> RetirementInputs:
                 "Annual spending goal (today's $)", 0.0, 2_000_000.0, float(sample.annual_spending_goal_today), step=1000.0
             )
             inflation_pct = st.slider("Inflation (annual)", 0.0, 0.10, float(sample.inflation_pct), 0.005)
-            withdrawal_ix = st.selectbox(
+            wo_label = st.selectbox(
                 "Withdrawal order",
-                options=range(len(WITHDRAWAL_OPTIONS)),
-                format_func=lambda i: WITHDRAWAL_OPTIONS[i][0],
-                index=0,
+                options=[
+                    ("Taxable → traditional → Roth", WithdrawalOrder.TAXABLE_TRADITIONAL_ROTH),
+                    ("Traditional → taxable → Roth", WithdrawalOrder.TRADITIONAL_TAXABLE_ROTH),
+                    ("Proportional across accounts", WithdrawalOrder.PROPORTIONAL),
+                ],
+                format_func=lambda x: x[0],
             )
-            withdrawal_order = WITHDRAWAL_OPTIONS[withdrawal_ix][1]
+            withdrawal_order = wo_label[1]
 
     return RetirementInputs(
         birth_year=int(birth_year),
@@ -180,13 +134,7 @@ def _inputs_from_sidebar() -> RetirementInputs:
 
 
 def main() -> None:
-    import matplotlib.pyplot as plt
-
-    venv_msg = venv_problem_message()
-    if venv_msg:
-        st.set_page_config(page_title="Retirement Planner", layout="wide")
-        st.error(venv_msg)
-        st.stop()
+    import streamlit as st
 
     st.set_page_config(
         page_title="Retirement Planner",
@@ -209,28 +157,18 @@ def main() -> None:
     st.title("Retirement cash-flow planner")
     st.caption("Enter assumptions in the sidebar. Reports update automatically. Not investment or tax advice.")
 
-    inputs = _inputs_from_sidebar()
-    inputs_key = _inputs_cache_key(inputs)
+    inputs = _inputs_from_sidebar(st)
 
     try:
-        df = cached_projection(inputs_key)
+        df = run_projection(inputs)
     except ValueError as exc:
         st.error(str(exc))
         return
-    except Exception as exc:  # noqa: BLE001 — show unexpected failures in the UI
-        st.exception(exc)
-        return
 
     summary = summarize_projection(df, inputs)
+    tab_summary, tab_table, tab_charts, tab_export = st.tabs(["Summary", "Year-by-year", "Charts", "Save & print"])
 
-    view = st.radio(
-        "Results",
-        ["Summary", "Year-by-year", "Charts", "Save & print"],
-        horizontal=True,
-        label_visibility="collapsed",
-    )
-
-    if view == "Summary":
+    with tab_summary:
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Ending balance", f"${summary['ending_balance']:,.0f}")
         if summary["balance_at_retirement"] is not None:
@@ -256,7 +194,7 @@ def main() -> None:
                 f"withdrawals ${row['withdrawal_total']:,.0f})."
             )
 
-    elif view == "Year-by-year":
+    with tab_table:
         show = st.multiselect(
             "Columns",
             options=list(report_dataframe(df).columns),
@@ -265,25 +203,29 @@ def main() -> None:
         table = report_dataframe(df)
         if show:
             table = table[show]
-        st.dataframe(table, use_container_width=True, height=480)
+        st.dataframe(
+            table.style.format(
+                {c: "${:,.0f}" for c in table.columns if c not in ("Year", "Age", "Phase")},
+                na_rep="",
+            ),
+            use_container_width=True,
+            height=480,
+        )
 
-    elif view == "Charts":
+    with tab_charts:
         fig_income = income_chart_figure(df)
         if fig_income:
             st.pyplot(fig_income, use_container_width=True)
-            plt.close(fig_income)
         fig_bal = balance_chart_figure(df)
         if fig_bal:
             st.pyplot(fig_bal, use_container_width=True)
-            plt.close(fig_bal)
 
-    else:
+    with tab_export:
         st.subheader("Download")
         col_a, col_b, col_c = st.columns(3)
         csv_bytes = report_dataframe(df).to_csv(index=False).encode("utf-8")
-        html_text = cached_html_report(inputs_key)
-        html_bytes = html_text.encode("utf-8")
-        xlsx_bytes = cached_workbook(inputs_key)
+        html_bytes = build_html_report(df, inputs).encode("utf-8")
+        xlsx_bytes = workbook_bytes(inputs)
 
         col_a.download_button(
             "Download CSV",
@@ -310,10 +252,33 @@ def main() -> None:
         st.subheader("Print")
         st.markdown(
             "1. **From this page:** use your browser **Print** (Ctrl+P). Side panels are hidden in print view.\n"
-            "2. **Full report:** download **HTML report**, open it in a browser, then **Print** or **Save as PDF**."
+            "2. **Full report:** download **HTML report**, open it in Chrome or Edge, then **Print** or **Save as PDF**."
         )
-        if st.checkbox("Show HTML preview (can be slow the first time)"):
-            st.components.v1.html(html_text, height=600, scrolling=True)
+        with st.expander("Preview HTML report (scrollable)"):
+            st.components.v1.html(build_html_report(df, inputs), height=600, scrolling=True)
 
 
-main()
+def _launch() -> None:
+    """Run under Streamlit server; re-launch if started as `python streamlit_app.py`."""
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    from streamlit.runtime.scriptrunner import get_script_run_ctx
+
+    if get_script_run_ctx() is not None:
+        main()
+        return
+
+    script = Path(__file__).resolve()
+    print("Launching Streamlit (use run-streamlit.bat or: python -m streamlit run streamlit_app.py)")
+    raise SystemExit(subprocess.call([sys.executable, "-m", "streamlit", "run", str(script)]))
+
+
+if __name__ == "__main__":
+    _launch()
+else:
+    from streamlit.runtime.scriptrunner import get_script_run_ctx
+
+    if get_script_run_ctx() is not None:
+        main()
