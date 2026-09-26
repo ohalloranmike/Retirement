@@ -1,3 +1,6 @@
+# Install into your venv: python -m pip install -r requirements.txt
+# Or editable install (recommended for PyCharm): python -m pip install -e .
+numpy>=1.24.0
 pandas>=2.0.0
 matplotlib>=3.7.0
 openpyxl>=3.1.0

@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "retirement-planner"
+version = "0.1.0"
+description = "Deterministic retirement income and balance projection"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24.0",
+    "pandas>=2.0.0",
+    "matplotlib>=3.7.0",
+    "openpyxl>=3.1.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["retirement*"]

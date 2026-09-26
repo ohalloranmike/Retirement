@@ -6,10 +6,27 @@ Deterministic year-by-year model for **401(k), traditional/Roth IRA, taxable acc
 
 ## Setup
 
-```bash
+Use the project virtual environment (`.venv` is not committed to git).
+
+**Windows (PowerShell):**
+
+```powershell
 cd c:\Users\mohal2\PycharmProjects\Retirement
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -e .
+```
+
+`pip install -e .` reads dependencies from `pyproject.toml` and registers the `retirement` package so imports work in PyCharm and the terminal.
+
+Alternative (requirements file only):
+
+```powershell
 python -m pip install -r requirements.txt
 ```
+
+**PyCharm:** Settings → Project → Python Interpreter → select `.venv\Scripts\python.exe`, then use *Install requirements* on `requirements.txt` or run `pip install -e .` in the terminal with the venv active.
 
 ## Quick start (Python)
 
