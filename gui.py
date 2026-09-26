@@ -3,6 +3,10 @@
 
 from __future__ import annotations
 
+from bootstrap_venv import relaunch_with_project_venv
+
+relaunch_with_project_venv(__file__)
+
 import sys
 import webbrowser
 

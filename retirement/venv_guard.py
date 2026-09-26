@@ -65,7 +65,15 @@ def venv_problem_message() -> str | None:
         if sys.platform == "win32":
             lines.append("Use:  .\\run-gui.ps1   or   .\\run-streamlit.ps1")
         else:
-            lines.append("Use:  ./run-gui.sh   or   ./run-streamlit.sh")
+            lines.extend(
+                [
+                    "Use:  ./run-gui.sh   or   ./run-streamlit.sh",
+                    "Or:   .venv/bin/python -m streamlit run streamlit_app.py",
+                    "",
+                    "If you used system `streamlit` or PyCharm with /usr/bin/python,",
+                    "pull the latest code (auto-relaunch) or switch the IDE interpreter to .venv/bin/python3.",
+                ]
+            )
         return "\n".join(lines)
     return None
 

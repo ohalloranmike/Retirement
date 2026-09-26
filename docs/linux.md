@@ -26,7 +26,7 @@ chmod +x run-gui.sh run-streamlit.sh
 | Desktop (Tkinter) | `./run-gui.sh` |
 | Browser (Streamlit) | `./run-streamlit.sh` then open **http://127.0.0.1:8501** |
 
-Always use the shell scripts (or `.venv/bin/python` directly). System `python3` / global `streamlit` will fail the venv check or miss dependencies.
+Prefer the shell scripts (or `.venv/bin/python` directly). If you run `streamlit run` with **system** `/usr/bin/python3`, recent versions of this project **re-launch** using `.venv/bin/python` automatically. If you still see a venv error, create `.venv` and run `./run-streamlit.sh`.
 
 ## Troubleshooting
 
