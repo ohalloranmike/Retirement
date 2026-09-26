@@ -28,7 +28,27 @@ python -m pip install -r requirements.txt
 
 **PyCharm:** Settings → Project → Python Interpreter → select `.venv\Scripts\python.exe`, then use *Install requirements* on `requirements.txt` or run `pip install -e .` in the terminal with the venv active.
 
-## Quick start (Python)
+## Desktop GUI (recommended — standalone)
+
+Self-contained Windows/Mac/Linux app (Tkinter, no browser). Enter all options, run the projection, then export Excel, CSV, HTML, charts, or **everything at once**:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+pip install -e .
+python gui.py
+```
+
+**File** menu: Export Excel, CSV, HTML, chart PNGs, export all to a folder, or open HTML in the browser for **Print / Save as PDF**. **View** menu: switch **dark** or **light** theme (Sun Valley modern ttk styling).
+
+## Streamlit app (optional)
+
+Browser-based UI with the same exports:
+
+```powershell
+streamlit run streamlit_app.py
+```
+
+## Quick start (CLI)
 
 ```bash
 python main.py --summary
@@ -74,4 +94,7 @@ Federal tax on withdrawals, Roth conversions, Monte Carlo, state tax, IRMAA, or 
 - `retirement/rmd.py` — SECURE 2.0 start age and uniform lifetime table
 - `retirement/social_security.py` — early/late claiming adjustments + COLA
 - `retirement/excel_export.py` — workbook create/refresh
+- `gui.py` — standalone desktop GUI (main interactive program)
+- `streamlit_app.py` — optional browser UI
+- `retirement/report.py` — summary metrics and HTML report
 - `main.py` — CLI
