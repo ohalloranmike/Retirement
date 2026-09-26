@@ -8,7 +8,6 @@ import json
 import sys
 from pathlib import Path
 
-from retirement.charts import save_charts
 from retirement.excel_export import create_workbook, refresh_projection_in_workbook
 from retirement.projection import default_sample_inputs, inputs_from_dict, run_projection
 
@@ -65,6 +64,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Wrote CSV: {args.csv}")
 
     if args.charts:
+        from retirement.charts import save_charts
+
         paths = save_charts(df, args.charts)
         for p in paths:
             print(f"Wrote chart: {p}")
