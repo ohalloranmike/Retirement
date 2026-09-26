@@ -54,6 +54,25 @@ class RetirementInputs:
     spouse_ss_monthly_at_fra: float = 0.0
     spouse_ss_claim_age: int = 67
 
+    # --- v2: tax, Roth detail, conversions, Monte Carlo ---
+    use_tax_modeling: bool = False
+    filing_status: str = "single"  # single | mfj
+    state_code: str = "OR"
+    state_custom_tax_rate: float = 0.05
+    taxable_cost_basis_ratio: float = 0.60  # fraction of taxable acct that is basis
+    medicare_start_age: int = 65
+
+    roth_posttax_opening_balance: float = 0.0  # post-tax $ already in Roth before employer match
+    employer_match_to_roth: bool = False  # match deposited in Roth as pre-tax component
+    employee_401k_to_roth: bool = False  # employee deferrals to Roth 401(k) vs traditional
+
+    roth_conversion_annual: float = 0.0
+    roth_conversion_start_age: int = 0  # 0 = disabled
+    roth_conversion_end_age: int = 0
+
+    monte_carlo_return_std: float = 0.12
+    run_monte_carlo_trials: int = 0  # 0 = skip; >0 runs after deterministic plan
+
     def validate(self) -> None:
         if self.life_expectancy_age <= self.retirement_age:
             raise ValueError("life_expectancy_age must be greater than retirement_age")
@@ -65,6 +84,10 @@ class RetirementInputs:
             raise ValueError("annual_return_pre_retirement must be between -50% and 50%")
         if self.annual_return_post_retirement < -0.5 or self.annual_return_post_retirement > 0.5:
             raise ValueError("annual_return_post_retirement must be between -50% and 50%")
+        if self.roth_posttax_opening_balance > self.balance_roth_ira + 1:
+            raise ValueError("roth_posttax_opening_balance cannot exceed total Roth balance")
+        if self.use_tax_modeling and self.filing_status.lower() not in ("single", "mfj"):
+            raise ValueError("filing_status must be single or mfj")
 
 
 ProjectionRowKey = Literal[

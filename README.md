@@ -1,6 +1,8 @@
-# Retirement Planner (v1)
+# Retirement Planner
 
-Deterministic year-by-year model for **401(k), traditional/Roth IRA, taxable accounts, pension, and Social Security**, with **RMDs** (SECURE 2.0 ages), inflation-adjusted spending, and configurable withdrawal order.
+Deterministic year-by-year model for **401(k), traditional/Roth IRA, taxable accounts, pension, and Social Security**, with **RMDs** (SECURE 2.0 ages), inflation-adjusted spending, and configurable withdrawal order. Optional **v2** adds tax, IRMAA, Roth conversions, mixed Roth pools, and Monte Carlo.
+
+**Full feature list and new-user guide:** [docs/features.md](docs/features.md)
 
 **Not investment or tax advice.** SS and pension are simplified; use SSA.gov estimates and your plan documents for real decisions.
 
@@ -78,22 +80,17 @@ python main.py --excel retirement_planner.xlsx --refresh --summary
 
 Opening `retirement_planner.xlsx` after `--init` includes charts on the Projection sheet.
 
-## Inputs (high level)
+## Documentation
 
-| Area | Fields |
-|------|--------|
-| Timeline | birth year, retirement age, life expectancy, planning start year |
-| Balances | 401(k), traditional IRA, Roth IRA, taxable |
-| Savings | salary, 401(k) deferral, employer match, IRA (traditional or Roth) |
-| Returns | pre- and post-retirement annual return (fixed) |
-| Pension | monthly benefit, start age, optional COLA |
-| Social Security | monthly at FRA, claim age (62–70), COLA; optional spouse SS |
-| Spending | annual goal in today’s dollars, inflation rate |
-| Withdrawals | `taxable_traditional_roth`, `traditional_taxable_roth`, or `proportional` |
+- **[docs/features.md](docs/features.md)** — complete v1/v2 features, inputs, Roth pools, exports, limitations, troubleshooting
+- `config/sample.json` — basic plan
+- `config/sample_v2.json` — tax, Roth pools, conversions, Monte Carlo
 
-## What v1 does not include
+Quick v2 run:
 
-Federal tax on withdrawals, Roth conversions, Monte Carlo, state tax, IRMAA, or full two-earner SS rules. These can be added in later layers.
+```powershell
+python main.py --config config\sample_v2.json --summary --monte-carlo
+```
 
 ## Project layout
 

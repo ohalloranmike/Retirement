@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 from retirement.excel_export import create_workbook, refresh_projection_in_workbook
+from retirement.models import RetirementInputs
 from retirement.projection import default_sample_inputs, inputs_from_dict, run_projection
 from retirement.venv_guard import require_project_venv
 
@@ -27,6 +28,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--csv", type=Path, help="Write projection CSV to this path")
     parser.add_argument("--charts", type=Path, help="Directory to write PNG charts")
     parser.add_argument("--summary", action="store_true", help="Print end-of-plan summary to stdout")
+    parser.add_argument(
+        "--monte-carlo",
+        action="store_true",
+        help="Run Monte Carlo using run_monte_carlo_trials from config (or 1000 default)",
+    )
     args = parser.parse_args(argv)
 
     root = Path(__file__).resolve().parent
@@ -48,6 +54,7 @@ def main(argv: list[str] | None = None) -> int:
             _print_summary(df)
         return 0
 
+    inputs: RetirementInputs | None = None
     if args.excel and args.excel.exists():
         df = refresh_projection_in_workbook(args.excel)
         print(f"Using inputs from {args.excel}")
@@ -74,6 +81,18 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.summary or (not args.csv and not args.charts):
         _print_summary(df)
+
+    if args.monte_carlo:
+        from retirement.monte_carlo import run_monte_carlo
+
+        if inputs is None:
+            inputs = default_sample_inputs()
+        trials = inputs.run_monte_carlo_trials if inputs.run_monte_carlo_trials > 0 else 0
+        if trials <= 0:
+            trials = 1000
+        mc = run_monte_carlo(inputs, trials=trials)
+        print(f"\nMonte Carlo ({mc.trials} trials): success {mc.success_rate:.1%}")
+        print(f"Ending balance median ${mc.median_ending_balance:,.0f} (p10 ${mc.p10_ending_balance:,.0f}, p90 ${mc.p90_ending_balance:,.0f})")
 
     return 0
 

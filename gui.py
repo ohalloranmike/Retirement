@@ -82,6 +82,10 @@ class RetirementPlannerApp(tk.Tk):
 
         self._fields: dict[str, LabeledEntry] = {}
         self._ira_roth_var = tk.BooleanVar(value=True)
+        self._use_tax_var = tk.BooleanVar(value=False)
+        self._emp_roth_var = tk.BooleanVar(value=False)
+        self._match_roth_var = tk.BooleanVar(value=False)
+        self._filing_var = tk.StringVar(value="single")
         self._withdrawal_var = tk.StringVar(value=list(WITHDRAWAL_LABELS.keys())[0])
         self._theme_name = "dark"
         self._colors: dict[str, str] = {}
@@ -248,6 +252,35 @@ class RetirementPlannerApp(tk.Tk):
             state="readonly",
         ).pack(fill="x")
 
+        adv = ttk.LabelFrame(inputs_frame, text="Advanced (v2): tax, Roth pools, conversions", padding=10)
+        adv.pack(fill="x", pady=(0, 12))
+        ttk.Checkbutton(adv, text="Model federal / state tax, IRMAA (after-tax spending)", variable=self._use_tax_var).pack(
+            anchor="w"
+        )
+        ttk.Checkbutton(adv, text="Employee 401(k) deferrals → Roth (post-tax pool)", variable=self._emp_roth_var).pack(
+            anchor="w"
+        )
+        ttk.Checkbutton(adv, text="Employer match → Roth (pre-tax pool)", variable=self._match_roth_var).pack(anchor="w")
+        fil = ttk.Frame(adv)
+        fil.pack(fill="x", pady=4)
+        ttk.Label(fil, text="Filing status").pack(side="left")
+        ttk.Combobox(fil, textvariable=self._filing_var, values=["single", "mfj"], state="readonly", width=10).pack(
+            side="left", padx=8
+        )
+        for key, label in [
+            ("state_code", "State code (e.g. OR, none, custom)"),
+            ("state_custom_tax_rate", "Custom state rate (if state=custom)"),
+            ("taxable_cost_basis_ratio", "Taxable acct cost basis ratio (0–1)"),
+            ("roth_posttax_opening_balance", "Roth post-tax $ before employer match"),
+            ("roth_conversion_annual", "Roth conversion $ / year"),
+            ("roth_conversion_start_age", "Conversion start age (0=off)"),
+            ("roth_conversion_end_age", "Conversion end age"),
+            ("run_monte_carlo_trials", "Monte Carlo trials (0=skip)"),
+        ]:
+            entry = LabeledEntry(adv, label)
+            entry.pack(fill="x", pady=2)
+            self._fields[key] = entry
+
         results_notebook = ttk.Notebook(paned, padding=4)
         paned.add(results_notebook, weight=1)
 
@@ -290,6 +323,10 @@ class RetirementPlannerApp(tk.Tk):
             else:
                 entry.set(val)
         self._ira_roth_var.set(sample.ira_is_roth)
+        self._use_tax_var.set(sample.use_tax_modeling)
+        self._emp_roth_var.set(sample.employee_401k_to_roth)
+        self._match_roth_var.set(sample.employer_match_to_roth)
+        self._filing_var.set(sample.filing_status)
         for label, enum in WITHDRAWAL_LABELS.items():
             if enum == sample.withdrawal_order:
                 self._withdrawal_var.set(label)
@@ -338,6 +375,30 @@ class RetirementPlannerApp(tk.Tk):
             ),
             inflation_pct=_parse_float(self._fields["inflation_pct"].var.get(), "Inflation"),
             withdrawal_order=wo,
+            use_tax_modeling=self._use_tax_var.get(),
+            filing_status=self._filing_var.get(),
+            state_code=self._fields["state_code"].var.get().strip() or "none",
+            state_custom_tax_rate=_parse_float(
+                self._fields["state_custom_tax_rate"].var.get(), "State tax rate"
+            ),
+            taxable_cost_basis_ratio=_parse_float(
+                self._fields["taxable_cost_basis_ratio"].var.get(), "Cost basis ratio"
+            ),
+            roth_posttax_opening_balance=_parse_float(
+                self._fields["roth_posttax_opening_balance"].var.get(), "Roth post-tax opening"
+            ),
+            employee_401k_to_roth=self._emp_roth_var.get(),
+            employer_match_to_roth=self._match_roth_var.get(),
+            roth_conversion_annual=_parse_float(self._fields["roth_conversion_annual"].var.get(), "Conversion amount"),
+            roth_conversion_start_age=_parse_int(
+                self._fields["roth_conversion_start_age"].var.get(), "Conversion start age"
+            ),
+            roth_conversion_end_age=_parse_int(
+                self._fields["roth_conversion_end_age"].var.get(), "Conversion end age"
+            ),
+            run_monte_carlo_trials=_parse_int(
+                self._fields["run_monte_carlo_trials"].var.get(), "Monte Carlo trials"
+            ),
         )
 
     def run_projection(self) -> None:
@@ -353,7 +414,13 @@ class RetirementPlannerApp(tk.Tk):
         self._refresh_summary(df, inputs)
         self._refresh_table(df)
         self._refresh_charts(df)
-        messagebox.showinfo("Projection complete", f"Calculated {len(df)} years. Use File → Export to save reports.")
+        msg = f"Calculated {len(df)} years. Use File → Export to save reports."
+        if inputs.run_monte_carlo_trials > 0:
+            from retirement.monte_carlo import run_monte_carlo
+
+            mc = run_monte_carlo(inputs, trials=inputs.run_monte_carlo_trials)
+            msg += f"\n\nMonte Carlo ({mc.trials} runs): {mc.success_rate:.1%} success, median ending ${mc.median_ending_balance:,.0f}."
+        messagebox.showinfo("Projection complete", msg)
 
     def _require_results(self) -> tuple[pd.DataFrame, RetirementInputs] | None:
         if self._df is None or self._inputs is None:

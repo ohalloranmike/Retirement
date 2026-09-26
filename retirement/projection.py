@@ -6,7 +6,9 @@ import pandas as pd
 
 from retirement.models import RetirementInputs, WithdrawalOrder
 from retirement.rmd import required_minimum_distribution, rmd_start_age
+from retirement.roth_pools import RothPoolState
 from retirement.social_security import monthly_benefit_at_claim
+from retirement.tax.engine import compute_year_taxes
 
 
 def _employer_match(inputs: RetirementInputs) -> float:
@@ -113,6 +115,14 @@ def _allocate_withdrawals(
     return {**out, **balances}
 
 
+def _init_roth_pool(inputs: RetirementInputs) -> RothPoolState | None:
+    if not inputs.use_tax_modeling:
+        return None
+    posttax = min(inputs.roth_posttax_opening_balance, inputs.balance_roth_ira)
+    pretax = max(0.0, inputs.balance_roth_ira - posttax)
+    return RothPoolState(posttax_balance=posttax, pretax_balance=pretax)
+
+
 def run_projection(inputs: RetirementInputs) -> pd.DataFrame:
     inputs.validate()
     rows: list[dict[str, Any]] = []
@@ -121,6 +131,9 @@ def run_projection(inputs: RetirementInputs) -> pd.DataFrame:
     b_trad = inputs.balance_traditional_ira
     b_roth = inputs.balance_roth_ira
     b_tax = inputs.balance_taxable
+    roth_pool = _init_roth_pool(inputs)
+    if roth_pool is not None:
+        b_roth = roth_pool.total
 
     cumulative_shortfall = 0.0
     rmd_age = rmd_start_age(inputs.birth_year)
@@ -140,25 +153,45 @@ def run_projection(inputs: RetirementInputs) -> pd.DataFrame:
 
         contrib_401k = 0.0
         contrib_ira = 0.0
+        roth_conversion = 0.0
         if pre_retirement:
-            contrib_401k = inputs.employee_401k_contribution + match
+            if inputs.use_tax_modeling:
+                if inputs.employee_401k_to_roth and roth_pool is not None:
+                    roth_pool.add_contribution(inputs.employee_401k_contribution, to_pretax=False)
+                else:
+                    contrib_401k += inputs.employee_401k_contribution
+                if inputs.employer_match_to_roth and roth_pool is not None:
+                    roth_pool.add_contribution(match, to_pretax=True)
+                else:
+                    contrib_401k += match
+            else:
+                contrib_401k = inputs.employee_401k_contribution + match
             contrib_ira = inputs.annual_ira_contribution
 
         # Growth on beginning-of-year balances (after contributions applied at start)
         b_401k += contrib_401k
         if inputs.ira_is_roth:
-            b_roth += contrib_ira
+            if roth_pool is not None:
+                roth_pool.add_contribution(contrib_ira, to_pretax=False)
+            else:
+                b_roth += contrib_ira
         else:
             b_trad += contrib_ira
 
         g_401k = b_401k * ret_rate
         g_trad = b_trad * ret_rate
-        g_roth = b_roth * ret_rate
+        if roth_pool is not None:
+            roth_before = roth_pool.total
+            roth_pool.apply_growth(ret_rate)
+            g_roth = roth_pool.total - roth_before
+            b_roth = roth_pool.total
+        else:
+            g_roth = b_roth * ret_rate
+            b_roth += g_roth
         g_tax = b_tax * ret_rate
 
         b_401k += g_401k
         b_trad += g_trad
-        b_roth += g_roth
         b_tax += g_tax
 
         pension = 0.0
@@ -167,6 +200,23 @@ def run_projection(inputs: RetirementInputs) -> pd.DataFrame:
         spending = 0.0
         w_401k = w_trad = w_roth = w_tax = 0.0
         rmd_amount = 0.0
+        roth_qualified = roth_taxable = 0.0
+        federal_tax = state_tax = irmaa = total_tax = 0.0
+        after_tax_income = 0.0
+
+        if not pre_retirement:
+            if (
+                inputs.use_tax_modeling
+                and inputs.roth_conversion_start_age > 0
+                and inputs.roth_conversion_start_age <= age <= inputs.roth_conversion_end_age
+            ):
+                roth_conversion = min(inputs.roth_conversion_annual, b_trad + b_401k)
+                from_trad = min(roth_conversion, b_trad)
+                b_trad -= from_trad
+                remainder = roth_conversion - from_trad
+                b_401k -= remainder
+                if roth_pool is not None:
+                    roth_pool.convert_in_from_traditional(roth_conversion)
 
         if not pre_retirement:
             spending = _spending_need(inputs, years_from_start)
@@ -180,42 +230,95 @@ def run_projection(inputs: RetirementInputs) -> pd.DataFrame:
                 inputs.spouse_ss_claim_age,
             )
             income_fixed = pension + ss + spouse_ss
-            portfolio_need = max(0.0, spending - income_fixed)
+            portfolio_need = max(0.0, spending - income_fixed) if not inputs.use_tax_modeling else spending * 0.85
 
             trad_for_rmd = b_401k + b_trad
             if age >= rmd_age and trad_for_rmd > 0:
                 rmd_amount = required_minimum_distribution(trad_for_rmd, age)
 
-            balances = {
-                "balance_401k": b_401k,
-                "balance_traditional_ira": b_trad,
-                "balance_roth_ira": b_roth,
-                "balance_taxable": b_tax,
-            }
-            alloc = _allocate_withdrawals(
-                portfolio_need,
-                balances,
-                inputs.withdrawal_order,
-                rmd_amount,
-            )
-            w_401k = alloc["withdrawal_401k"]
-            w_trad = alloc["withdrawal_traditional_ira"]
-            w_roth = alloc["withdrawal_roth"]
-            w_tax = alloc["withdrawal_taxable"]
+            snap_401k, snap_trad, snap_tax = b_401k, b_trad, b_tax
+            snap_roth_post = roth_pool.posttax_balance if roth_pool else 0.0
+            snap_roth_pre = roth_pool.pretax_balance if roth_pool else 0.0
+            snap_roth = b_roth
 
-            b_401k = alloc["balance_401k"]
-            b_trad = alloc["balance_traditional_ira"]
-            b_roth = alloc["balance_roth_ira"]
-            b_tax = alloc["balance_taxable"]
+            for _ in range(10):
+                b_401k, b_trad, b_tax = snap_401k, snap_trad, snap_tax
+                b_roth = snap_roth
+                if roth_pool is not None:
+                    roth_pool.posttax_balance = snap_roth_post
+                    roth_pool.pretax_balance = snap_roth_pre
+                    b_roth = roth_pool.total
+
+                balances = {
+                    "balance_401k": b_401k,
+                    "balance_traditional_ira": b_trad,
+                    "balance_roth_ira": b_roth,
+                    "balance_taxable": b_tax,
+                }
+                alloc = _allocate_withdrawals(
+                    portfolio_need,
+                    balances,
+                    inputs.withdrawal_order,
+                    rmd_amount,
+                )
+                w_401k = alloc["withdrawal_401k"]
+                w_trad = alloc["withdrawal_traditional_ira"]
+                w_roth = alloc["withdrawal_roth"]
+                w_tax = alloc["withdrawal_taxable"]
+
+                if roth_pool is not None and w_roth > 0:
+                    roth_qualified, roth_taxable = roth_pool.withdraw(w_roth)
+                    b_roth = roth_pool.total
+                else:
+                    roth_qualified, roth_taxable = w_roth, 0.0
+
+                b_401k = alloc["balance_401k"]
+                b_trad = alloc["balance_traditional_ira"]
+                if roth_pool is None:
+                    b_roth = alloc["balance_roth_ira"]
+                b_tax = alloc["balance_taxable"]
+
+                if not inputs.use_tax_modeling:
+                    break
+
+                tax = compute_year_taxes(
+                    filing_status=inputs.filing_status,
+                    state_code=inputs.state_code,
+                    state_custom_rate=inputs.state_custom_tax_rate,
+                    age=age,
+                    medicare_age=inputs.medicare_start_age,
+                    ss_benefits=ss + spouse_ss,
+                    pension=pension,
+                    withdrawal_traditional=w_401k + w_trad,
+                    withdrawal_taxable=w_tax,
+                    taxable_account_cost_basis_ratio=inputs.taxable_cost_basis_ratio,
+                    roth_taxable_withdrawal=roth_taxable,
+                    roth_conversion_income=roth_conversion,
+                    roth_qualified_withdrawal=roth_qualified,
+                )
+                after_tax_income = tax.after_tax_cash
+                federal_tax = tax.federal_total
+                state_tax = tax.state_tax
+                irmaa = tax.irmaa_surcharge
+                total_tax = tax.total_tax
+                if after_tax_income >= spending - 5:
+                    break
+                gap = spending - after_tax_income
+                portfolio_need = max(portfolio_need + gap * 1.15, portfolio_need * 1.05)
 
         withdrawal_total = w_401k + w_trad + w_roth + w_tax
         income_total = pension + ss + spouse_ss + withdrawal_total
-        surplus = income_total - spending if not pre_retirement else 0.0
+        if not pre_retirement:
+            if inputs.use_tax_modeling:
+                surplus = after_tax_income - spending
+            else:
+                surplus = income_total - spending
+        else:
+            surplus = 0.0
         if not pre_retirement and surplus < 0:
             cumulative_shortfall += -surplus
 
-        rows.append(
-            {
+        row: dict[str, Any] = {
                 "year": year,
                 "age": age,
                 "phase": "accumulation" if pre_retirement else "retirement",
@@ -245,8 +348,23 @@ def run_projection(inputs: RetirementInputs) -> pd.DataFrame:
                 "spending_need": spending,
                 "surplus_or_shortfall": surplus,
                 "cumulative_shortfall": cumulative_shortfall,
-            }
-        )
+        }
+        if inputs.use_tax_modeling:
+            row.update(
+                {
+                    "federal_tax": federal_tax,
+                    "state_tax": state_tax,
+                    "irmaa_surcharge": irmaa,
+                    "total_tax": total_tax,
+                    "after_tax_income": after_tax_income,
+                    "roth_conversion": roth_conversion,
+                    "roth_withdrawal_taxable": roth_taxable,
+                    "roth_withdrawal_qualified": roth_qualified,
+                    "roth_posttax_balance": roth_pool.posttax_balance if roth_pool else b_roth,
+                    "roth_pretax_balance": roth_pool.pretax_balance if roth_pool else 0.0,
+                }
+            )
+        rows.append(row)
 
         year += 1
         years_from_start += 1
