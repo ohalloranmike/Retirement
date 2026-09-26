@@ -6,34 +6,13 @@ from retirement.venv_guard import require_project_venv
 
 require_project_venv()
 
-import streamlit as st
-
 from retirement.charts import balance_chart_figure, income_chart_figure
 from retirement.models import RetirementInputs, WithdrawalOrder
 from retirement.projection import default_sample_inputs, run_projection
 from retirement.report import build_html_report, report_dataframe, summarize_projection, workbook_bytes
 
-st.set_page_config(
-    page_title="Retirement Planner",
-    page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
 
-st.markdown(
-    """
-    <style>
-    @media print {
-        [data-testid="stSidebar"], [data-testid="stToolbar"], footer, header { display: none !important; }
-        .main .block-container { max-width: 100%; padding-top: 0; }
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-
-def _inputs_from_sidebar() -> RetirementInputs:
+def _inputs_from_sidebar(st) -> RetirementInputs:
     sample = default_sample_inputs()
     with st.sidebar:
         st.header("Your plan")
@@ -155,10 +134,30 @@ def _inputs_from_sidebar() -> RetirementInputs:
 
 
 def main() -> None:
+    import streamlit as st
+
+    st.set_page_config(
+        page_title="Retirement Planner",
+        page_icon="📊",
+        layout="wide",
+        initial_sidebar_state="expanded",
+    )
+    st.markdown(
+        """
+        <style>
+        @media print {
+            [data-testid="stSidebar"], [data-testid="stToolbar"], footer, header { display: none !important; }
+            .main .block-container { max-width: 100%; padding-top: 0; }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     st.title("Retirement cash-flow planner")
     st.caption("Enter assumptions in the sidebar. Reports update automatically. Not investment or tax advice.")
 
-    inputs = _inputs_from_sidebar()
+    inputs = _inputs_from_sidebar(st)
 
     try:
         df = run_projection(inputs)
@@ -259,5 +258,27 @@ def main() -> None:
             st.components.v1.html(build_html_report(df, inputs), height=600, scrolling=True)
 
 
+def _launch() -> None:
+    """Run under Streamlit server; re-launch if started as `python streamlit_app.py`."""
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    from streamlit.runtime.scriptrunner import get_script_run_ctx
+
+    if get_script_run_ctx() is not None:
+        main()
+        return
+
+    script = Path(__file__).resolve()
+    print("Launching Streamlit (use run-streamlit.bat or: python -m streamlit run streamlit_app.py)")
+    raise SystemExit(subprocess.call([sys.executable, "-m", "streamlit", "run", str(script)]))
+
+
 if __name__ == "__main__":
-    main()
+    _launch()
+else:
+    from streamlit.runtime.scriptrunner import get_script_run_ctx
+
+    if get_script_run_ctx() is not None:
+        main()

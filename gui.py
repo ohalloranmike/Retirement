@@ -9,6 +9,8 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from typing import Any
 
+import customtkinter as ctk
+
 import matplotlib
 
 matplotlib.use("TkAgg")
@@ -57,19 +59,24 @@ def _parse_int(text: str, field: str) -> int:
         raise ValueError(f"{field} must be a whole number.") from None
 
 
-class LabeledEntry(ttk.Frame):
-    def __init__(self, master: tk.Misc, label: str, width: int = 16, **kwargs: Any) -> None:
-        super().__init__(master)
-        ttk.Label(self, text=label, anchor="w").grid(row=0, column=0, sticky="nw", padx=(0, 8))
+class LabeledEntry(ctk.CTkFrame):
+    def __init__(self, master: tk.Misc, label: str, **kwargs: Any) -> None:
+        super().__init__(master, fg_color="transparent", **kwargs)
         self.var = tk.StringVar()
-        ttk.Entry(self, textvariable=self.var, width=width, **kwargs).grid(row=0, column=1, sticky="ew")
-        self.columnconfigure(1, weight=1)
+        ctk.CTkLabel(self, text=label, anchor="w", font=ctk.CTkFont(size=12)).pack(fill="x", pady=(0, 1))
+        ctk.CTkEntry(
+            self,
+            textvariable=self.var,
+            height=28,
+            corner_radius=8,
+            border_width=1,
+        ).pack(fill="x", pady=(0, 2))
 
     def set(self, value: str | float | int) -> None:
         self.var.set(str(value))
 
 
-class RetirementPlannerApp(tk.Tk):
+class RetirementPlannerApp(ctk.CTk):
     def __init__(self) -> None:
         super().__init__()
         self.title("Retirement Planner")
@@ -85,13 +92,14 @@ class RetirementPlannerApp(tk.Tk):
         self._use_tax_var = tk.BooleanVar(value=False)
         self._emp_roth_var = tk.BooleanVar(value=False)
         self._match_roth_var = tk.BooleanVar(value=False)
-        self._filing_var = tk.StringVar(value="single")
-        self._withdrawal_var = tk.StringVar(value=list(WITHDRAWAL_LABELS.keys())[0])
-        self._theme_name = "dark"
+        self._theme_name = "light"
         self._colors: dict[str, str] = {}
-        self._scroll_canvas: tk.Canvas | None = None
-        self._disclaimer: ttk.Label | None = None
+        self._disclaimer: ctk.CTkLabel | None = None
+        self._withdrawal_combo: ctk.CTkComboBox | None = None
+        self._filing_combo: ctk.CTkComboBox | None = None
 
+        ctk.set_appearance_mode("light")
+        ctk.set_default_color_theme("blue")
         self._colors = apply_theme(self, self._theme_name)
         self._build_header()
         self._build_menu()
@@ -101,13 +109,20 @@ class RetirementPlannerApp(tk.Tk):
         self.load_sample_inputs()
 
     def _build_header(self) -> None:
-        header = ttk.Frame(self, padding=(16, 14, 16, 6))
-        header.pack(fill="x")
-        ttk.Label(header, text="Retirement Planner", style="Heading.TLabel").pack(anchor="w")
-        ttk.Label(
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.pack(fill="x", padx=16, pady=(14, 6))
+        ctk.CTkLabel(
+            header,
+            text="Retirement Planner",
+            font=ctk.CTkFont(size=22, weight="bold"),
+            anchor="w",
+        ).pack(anchor="w")
+        ctk.CTkLabel(
             header,
             text="Model income, balances, and withdrawals — then export or print your reports.",
-            style="Muted.TLabel",
+            font=ctk.CTkFont(size=12),
+            text_color=("#5c6370", "#9aa0a6"),
+            anchor="w",
         ).pack(anchor="w", pady=(4, 0))
 
     def set_theme(self, theme: str) -> None:
@@ -115,24 +130,12 @@ class RetirementPlannerApp(tk.Tk):
         self._colors = apply_theme(self, theme)
         self._apply_widget_colors()
         if self._disclaimer:
-            self._disclaimer.configure(style="Muted.TLabel")
+            self._disclaimer.configure(text_color=("#5c6370", "#9aa0a6"))
         if self._df is not None and self._inputs is not None:
             self._refresh_charts(self._df)
 
     def _apply_widget_colors(self) -> None:
-        c = self._colors
-        self._summary_text.configure(
-            bg=c["text_bg"],
-            fg=c["text_fg"],
-            insertbackground=c["text_insert"],
-            relief="flat",
-            borderwidth=0,
-            highlightthickness=0,
-            padx=12,
-            pady=12,
-        )
-        if self._scroll_canvas:
-            self._scroll_canvas.configure(bg=c["canvas"])
+        pass
 
     def _build_menu(self) -> None:
         menubar = tk.Menu(self)
@@ -162,17 +165,27 @@ class RetirementPlannerApp(tk.Tk):
         self.config(menu=menubar)
 
     def _build_toolbar(self) -> None:
-        bar = ttk.Frame(self, padding=(12, 8))
-        bar.pack(fill="x")
-        ttk.Button(bar, text="Run projection", style="Accent.TButton", command=self.run_projection).pack(
-            side="left", padx=(0, 10)
-        )
-        ttk.Button(bar, text="Export Excel…", command=self.export_excel).pack(side="left", padx=4)
-        ttk.Button(bar, text="Export all…", command=self.export_all).pack(side="left", padx=4)
-        self._disclaimer = ttk.Label(
+        bar = ctk.CTkFrame(self, fg_color="transparent")
+        bar.pack(fill="x", padx=12, pady=8)
+        ctk.CTkButton(
+            bar,
+            text="Run projection",
+            command=self.run_projection,
+            height=36,
+            corner_radius=10,
+            font=ctk.CTkFont(size=13, weight="bold"),
+        ).pack(side="left", padx=(0, 10))
+        ctk.CTkButton(
+            bar, text="Export Excel…", command=self.export_excel, height=34, corner_radius=10, fg_color="transparent", border_width=1
+        ).pack(side="left", padx=4)
+        ctk.CTkButton(
+            bar, text="Export all…", command=self.export_all, height=34, corner_radius=10, fg_color="transparent", border_width=1
+        ).pack(side="left", padx=4)
+        self._disclaimer = ctk.CTkLabel(
             bar,
             text="Educational model only — not investment or tax advice.",
-            style="Muted.TLabel",
+            font=ctk.CTkFont(size=11),
+            text_color=("#5c6370", "#9aa0a6"),
         )
         self._disclaimer.pack(side="right")
 
@@ -180,24 +193,15 @@ class RetirementPlannerApp(tk.Tk):
         paned = ttk.Panedwindow(self, orient=tk.HORIZONTAL)
         paned.pack(fill="both", expand=True, padx=12, pady=(0, 12))
 
-        inputs_outer = ttk.LabelFrame(paned, text="Assumptions", padding=4, width=440)
+        inputs_outer = ctk.CTkFrame(paned, width=440, corner_radius=12)
         paned.add(inputs_outer, weight=0)
-
-        canvas = tk.Canvas(inputs_outer, highlightthickness=0, borderwidth=0)
-        self._scroll_canvas = canvas
-        scroll = ttk.Scrollbar(inputs_outer, orient="vertical", command=canvas.yview)
-        inputs_frame = ttk.Frame(canvas, padding=(8, 4))
-        inputs_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.create_window((0, 0), window=inputs_frame, anchor="nw", width=400)
-        canvas.configure(yscrollcommand=scroll.set)
-        canvas.pack(side="left", fill="both", expand=True)
-        scroll.pack(side="right", fill="y")
-
-        def _on_mousewheel(event: tk.Event) -> None:
-            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
-
-        inputs_frame.bind("<Enter>", lambda _: canvas.bind_all("<MouseWheel>", _on_mousewheel))
-        inputs_frame.bind("<Leave>", lambda _: canvas.unbind_all("<MouseWheel>"))
+        inputs_frame = ctk.CTkScrollableFrame(
+            inputs_outer,
+            label_text="Assumptions",
+            corner_radius=12,
+            label_font=ctk.CTkFont(size=13, weight="bold"),
+        )
+        inputs_frame.pack(fill="both", expand=True, padx=4, pady=4)
 
         self._add_section(inputs_frame, "Timeline", [
             ("birth_year", "Birth year"),
@@ -218,9 +222,13 @@ class RetirementPlannerApp(tk.Tk):
             ("employer_match_up_to_pct_of_salary", "Match on first fraction of salary"),
             ("annual_ira_contribution", "IRA contribution / year"),
         ])
-        ira_row = ttk.Frame(inputs_frame)
-        ira_row.pack(fill="x", pady=(0, 8))
-        ttk.Checkbutton(ira_row, text="IRA contributions go to Roth", variable=self._ira_roth_var).pack(anchor="w")
+        ctk.CTkCheckBox(
+            inputs_frame,
+            text="IRA contributions go to Roth",
+            variable=self._ira_roth_var,
+            corner_radius=6,
+            font=ctk.CTkFont(size=12),
+        ).pack(anchor="w", pady=(0, 4), padx=4)
 
         self._add_section(inputs_frame, "Returns (annual, as decimal)", [
             ("annual_return_pre_retirement", "Before retirement"),
@@ -243,30 +251,62 @@ class RetirementPlannerApp(tk.Tk):
             ("annual_spending_goal_today", "Annual spending (today's dollars)"),
             ("inflation_pct", "Inflation (0–1)"),
         ])
-        wo_frame = ttk.LabelFrame(inputs_frame, text="Withdrawal order", padding=10)
-        wo_frame.pack(fill="x", pady=(0, 12))
-        ttk.Combobox(
+        wo_frame = ctk.CTkFrame(inputs_frame, corner_radius=12)
+        wo_frame.pack(fill="x", pady=(0, 6), padx=4)
+        ctk.CTkLabel(wo_frame, text="Withdrawal order", font=ctk.CTkFont(size=13, weight="bold")).pack(
+            anchor="w", padx=12, pady=(8, 2)
+        )
+        self._withdrawal_combo = ctk.CTkComboBox(
             wo_frame,
-            textvariable=self._withdrawal_var,
             values=list(WITHDRAWAL_LABELS.keys()),
             state="readonly",
-        ).pack(fill="x")
+            height=28,
+            corner_radius=8,
+            dropdown_hover_color=("#dbeafe", "#1e3a5f"),
+        )
+        self._withdrawal_combo.pack(fill="x", padx=12, pady=(0, 8))
+        self._withdrawal_combo.set(list(WITHDRAWAL_LABELS.keys())[0])
 
-        adv = ttk.LabelFrame(inputs_frame, text="Advanced (v2): tax, Roth pools, conversions", padding=10)
-        adv.pack(fill="x", pady=(0, 12))
-        ttk.Checkbutton(adv, text="Model federal / state tax, IRMAA (after-tax spending)", variable=self._use_tax_var).pack(
-            anchor="w"
+        adv = ctk.CTkFrame(inputs_frame, corner_radius=12)
+        adv.pack(fill="x", pady=(0, 6), padx=4)
+        ctk.CTkLabel(
+            adv,
+            text="Advanced (v2): tax, Roth pools, conversions",
+            font=ctk.CTkFont(size=13, weight="bold"),
+        ).pack(anchor="w", padx=12, pady=(8, 2))
+        inner_adv = ctk.CTkFrame(adv, fg_color="transparent")
+        inner_adv.pack(fill="x", padx=8, pady=(0, 6))
+        ctk.CTkCheckBox(
+            inner_adv,
+            text="Model federal / state tax, IRMAA (after-tax spending)",
+            variable=self._use_tax_var,
+            font=ctk.CTkFont(size=12),
+        ).pack(anchor="w", pady=0)
+        ctk.CTkCheckBox(
+            inner_adv,
+            text="Employee 401(k) deferrals → Roth (post-tax pool)",
+            variable=self._emp_roth_var,
+            font=ctk.CTkFont(size=12),
+        ).pack(anchor="w", pady=0)
+        ctk.CTkCheckBox(
+            inner_adv,
+            text="Employer match → Roth (pre-tax pool)",
+            variable=self._match_roth_var,
+            font=ctk.CTkFont(size=12),
+        ).pack(anchor="w", pady=0)
+        fil = ctk.CTkFrame(inner_adv, fg_color="transparent")
+        fil.pack(fill="x", pady=(2, 0))
+        ctk.CTkLabel(fil, text="Filing status", font=ctk.CTkFont(size=12)).pack(side="left")
+        self._filing_combo = ctk.CTkComboBox(
+            fil,
+            values=["single", "mfj"],
+            state="readonly",
+            width=120,
+            height=28,
+            corner_radius=8,
         )
-        ttk.Checkbutton(adv, text="Employee 401(k) deferrals → Roth (post-tax pool)", variable=self._emp_roth_var).pack(
-            anchor="w"
-        )
-        ttk.Checkbutton(adv, text="Employer match → Roth (pre-tax pool)", variable=self._match_roth_var).pack(anchor="w")
-        fil = ttk.Frame(adv)
-        fil.pack(fill="x", pady=4)
-        ttk.Label(fil, text="Filing status").pack(side="left")
-        ttk.Combobox(fil, textvariable=self._filing_var, values=["single", "mfj"], state="readonly", width=10).pack(
-            side="left", padx=8
-        )
+        self._filing_combo.pack(side="left", padx=8)
+        self._filing_combo.set("single")
         for key, label in [
             ("state_code", "State code (e.g. OR, none, custom)"),
             ("state_custom_tax_rate", "Custom state rate (if state=custom)"),
@@ -277,20 +317,22 @@ class RetirementPlannerApp(tk.Tk):
             ("roth_conversion_end_age", "Conversion end age"),
             ("run_monte_carlo_trials", "Monte Carlo trials (0=skip)"),
         ]:
-            entry = LabeledEntry(adv, label)
-            entry.pack(fill="x", pady=2)
+            entry = LabeledEntry(inner_adv, label)
+            entry.pack(fill="x", pady=0)
             self._fields[key] = entry
 
-        results_notebook = ttk.Notebook(paned, padding=4)
-        paned.add(results_notebook, weight=1)
+        results_outer = ctk.CTkFrame(paned, corner_radius=12, fg_color="transparent")
+        paned.add(results_outer, weight=1)
+        self._tabview = ctk.CTkTabview(results_outer, corner_radius=12)
+        self._tabview.pack(fill="both", expand=True)
 
-        summary_frame = ttk.Frame(results_notebook, padding=4)
-        results_notebook.add(summary_frame, text="  Summary  ")
-        self._summary_text = tk.Text(summary_frame, wrap="word", font=FONT_MONO)
-        self._summary_text.pack(fill="both", expand=True)
+        summary_tab = self._tabview.add("Summary")
+        self._summary_text = ctk.CTkTextbox(summary_tab, font=ctk.CTkFont(family=FONT_MONO[0], size=11), corner_radius=10)
+        self._summary_text.pack(fill="both", expand=True, padx=8, pady=8)
 
-        table_frame = ttk.Frame(results_notebook)
-        results_notebook.add(table_frame, text="  Year-by-year  ")
+        table_tab = self._tabview.add("Year-by-year")
+        table_frame = ctk.CTkFrame(table_tab, fg_color="transparent")
+        table_frame.pack(fill="both", expand=True, padx=4, pady=4)
         self._tree = ttk.Treeview(table_frame, show="headings")
         vsb = ttk.Scrollbar(table_frame, orient="vertical", command=self._tree.yview)
         hsb = ttk.Scrollbar(table_frame, orient="horizontal", command=self._tree.xview)
@@ -301,15 +343,19 @@ class RetirementPlannerApp(tk.Tk):
         table_frame.rowconfigure(0, weight=1)
         table_frame.columnconfigure(0, weight=1)
 
-        self._charts_frame = ttk.Frame(results_notebook)
-        results_notebook.add(self._charts_frame, text="  Charts  ")
+        charts_tab = self._tabview.add("Charts")
+        self._charts_frame = ctk.CTkFrame(charts_tab, fg_color="transparent")
+        self._charts_frame.pack(fill="both", expand=True)
 
-    def _add_section(self, parent: ttk.Frame, title: str, rows: list[tuple[str, str]]) -> None:
-        frame = ttk.LabelFrame(parent, text=title, padding=10)
-        frame.pack(fill="x", pady=(0, 10))
+    def _add_section(self, parent: ctk.CTkScrollableFrame, title: str, rows: list[tuple[str, str]]) -> None:
+        frame = ctk.CTkFrame(parent, corner_radius=12)
+        frame.pack(fill="x", pady=(0, 6), padx=4)
+        ctk.CTkLabel(frame, text=title, font=ctk.CTkFont(size=13, weight="bold")).pack(anchor="w", padx=12, pady=(8, 2))
+        inner = ctk.CTkFrame(frame, fg_color="transparent")
+        inner.pack(fill="x", padx=8, pady=(0, 6))
         for key, label in rows:
-            entry = LabeledEntry(frame, label)
-            entry.pack(fill="x", pady=2)
+            entry = LabeledEntry(inner, label)
+            entry.pack(fill="x", pady=0)
             self._fields[key] = entry
 
     def load_sample_inputs(self) -> None:
@@ -326,14 +372,17 @@ class RetirementPlannerApp(tk.Tk):
         self._use_tax_var.set(sample.use_tax_modeling)
         self._emp_roth_var.set(sample.employee_401k_to_roth)
         self._match_roth_var.set(sample.employer_match_to_roth)
-        self._filing_var.set(sample.filing_status)
-        for label, enum in WITHDRAWAL_LABELS.items():
-            if enum == sample.withdrawal_order:
-                self._withdrawal_var.set(label)
-                break
+        if self._filing_combo:
+            self._filing_combo.set(sample.filing_status)
+        if self._withdrawal_combo:
+            for label, enum in WITHDRAWAL_LABELS.items():
+                if enum == sample.withdrawal_order:
+                    self._withdrawal_combo.set(label)
+                    break
 
     def collect_inputs(self) -> RetirementInputs:
-        wo = WITHDRAWAL_LABELS.get(self._withdrawal_var.get(), WithdrawalOrder.TAXABLE_TRADITIONAL_ROTH)
+        wo_label = self._withdrawal_combo.get() if self._withdrawal_combo else ""
+        wo = WITHDRAWAL_LABELS.get(wo_label, WithdrawalOrder.TAXABLE_TRADITIONAL_ROTH)
         return RetirementInputs(
             birth_year=_parse_int(self._fields["birth_year"].var.get(), "Birth year"),
             planning_start_year=_parse_int(self._fields["planning_start_year"].var.get(), "Planning start year"),
@@ -376,7 +425,7 @@ class RetirementPlannerApp(tk.Tk):
             inflation_pct=_parse_float(self._fields["inflation_pct"].var.get(), "Inflation"),
             withdrawal_order=wo,
             use_tax_modeling=self._use_tax_var.get(),
-            filing_status=self._filing_var.get(),
+            filing_status=self._filing_combo.get() if self._filing_combo else "single",
             state_code=self._fields["state_code"].var.get().strip() or "none",
             state_custom_tax_rate=_parse_float(
                 self._fields["state_custom_tax_rate"].var.get(), "State tax rate"
@@ -445,7 +494,7 @@ class RetirementPlannerApp(tk.Tk):
         else:
             lines.append("No spending shortfalls in retirement years for this scenario.")
         lines.extend(["", "Use File menu to export Excel, CSV, HTML, charts, or everything at once."])
-        self._summary_text.delete("1.0", tk.END)
+        self._summary_text.delete("1.0", "end")
         self._summary_text.insert("1.0", "\n".join(lines))
 
     def _refresh_table(self, df: pd.DataFrame) -> None:

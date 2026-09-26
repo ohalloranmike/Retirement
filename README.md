@@ -49,7 +49,7 @@ pip install -e .
 python gui.py
 ```
 
-**File** menu: Export Excel, CSV, HTML, chart PNGs, export all to a folder, or open HTML in the browser for **Print / Save as PDF**. **View** menu: switch **dark** or **light** theme (Sun Valley modern ttk styling).
+**File** menu: Export Excel, CSV, HTML, chart PNGs, export all to a folder, or open HTML in the browser for **Print / Save as PDF**. **View** menu: switch **dark** or **light** theme (CustomTkinter rounded controls; Sun Valley styling for the year-by-year table).
 
 ## Streamlit app (optional)
 
