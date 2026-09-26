@@ -12,4 +12,5 @@ if [[ ! -x "${PYTHON}" ]]; then
   exit 1
 fi
 
+export MPLBACKEND=Agg
 exec "${PYTHON}" -m streamlit run "${ROOT}/streamlit_app.py"

@@ -46,6 +46,8 @@ chmod +x run-streamlit.sh   # once
 ./run-streamlit.sh
 ```
 
+Open the URL Streamlit prints (usually **http://127.0.0.1:8501**). If the page shell loads but the runner icon spins forever, pull the latest code (matplotlib uses a headless backend on Linux) and check the terminal for Python errors. Try another browser or disable VPN/proxy for localhost.
+
 ## Desktop GUI (recommended — standalone)
 
 Self-contained Windows/Mac/Linux app (Tkinter, no browser). Enter all options, run the projection, then export Excel, CSV, HTML, charts, or **everything at once**:

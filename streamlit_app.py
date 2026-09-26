@@ -2,6 +2,16 @@
 
 from __future__ import annotations
 
+import json
+from dataclasses import asdict
+
+import matplotlib
+
+matplotlib.use("Agg")
+
+import pandas as pd
+import streamlit as st
+
 from retirement.venv_guard import require_project_venv
 
 require_project_venv()
@@ -10,6 +20,12 @@ from retirement.charts import balance_chart_figure, income_chart_figure
 from retirement.models import RetirementInputs, WithdrawalOrder
 from retirement.projection import default_sample_inputs, run_projection
 from retirement.report import build_html_report, report_dataframe, summarize_projection, workbook_bytes
+
+
+def _inputs_cache_key(inputs: RetirementInputs) -> str:
+    data = asdict(inputs)
+    data["withdrawal_order"] = inputs.withdrawal_order.value
+    return json.dumps(data, sort_keys=True)
 
 
 def _inputs_from_sidebar(st) -> RetirementInputs:
@@ -133,8 +149,25 @@ def _inputs_from_sidebar(st) -> RetirementInputs:
     )
 
 
+@st.cache_data(show_spinner="Building Excel workbook…")
+def cached_workbook(inputs_key: str) -> bytes:
+    data = json.loads(inputs_key)
+    data["withdrawal_order"] = WithdrawalOrder(data["withdrawal_order"])
+    inputs = RetirementInputs(**data)
+    return workbook_bytes(inputs)
+
+
+@st.cache_data(show_spinner="Building HTML report…")
+def cached_html_report(inputs_key: str, df_json: str) -> str:
+    data = json.loads(inputs_key)
+    data["withdrawal_order"] = WithdrawalOrder(data["withdrawal_order"])
+    inputs = RetirementInputs(**data)
+    df = pd.read_json(df_json, orient="split")
+    return build_html_report(df, inputs)
+
+
 def main() -> None:
-    import streamlit as st
+    import matplotlib.pyplot as plt
 
     st.set_page_config(
         page_title="Retirement Planner",
@@ -158,13 +191,16 @@ def main() -> None:
     st.caption("Enter assumptions in the sidebar. Reports update automatically. Not investment or tax advice.")
 
     inputs = _inputs_from_sidebar(st)
+    inputs_key = _inputs_cache_key(inputs)
 
     try:
-        df = run_projection(inputs)
+        with st.spinner("Running projection…"):
+            df = run_projection(inputs)
     except ValueError as exc:
         st.error(str(exc))
         return
 
+    df_json = df.to_json(orient="split")
     summary = summarize_projection(df, inputs)
     tab_summary, tab_table, tab_charts, tab_export = st.tabs(["Summary", "Year-by-year", "Charts", "Save & print"])
 
@@ -216,16 +252,19 @@ def main() -> None:
         fig_income = income_chart_figure(df)
         if fig_income:
             st.pyplot(fig_income, use_container_width=True)
+            plt.close(fig_income)
         fig_bal = balance_chart_figure(df)
         if fig_bal:
             st.pyplot(fig_bal, use_container_width=True)
+            plt.close(fig_bal)
 
     with tab_export:
         st.subheader("Download")
         col_a, col_b, col_c = st.columns(3)
         csv_bytes = report_dataframe(df).to_csv(index=False).encode("utf-8")
-        html_bytes = build_html_report(df, inputs).encode("utf-8")
-        xlsx_bytes = workbook_bytes(inputs)
+        html_text = cached_html_report(inputs_key, df_json)
+        html_bytes = html_text.encode("utf-8")
+        xlsx_bytes = cached_workbook(inputs_key)
 
         col_a.download_button(
             "Download CSV",
@@ -255,7 +294,7 @@ def main() -> None:
             "2. **Full report:** download **HTML report**, open it in Chrome or Edge, then **Print** or **Save as PDF**."
         )
         with st.expander("Preview HTML report (scrollable)"):
-            st.components.v1.html(build_html_report(df, inputs), height=600, scrolling=True)
+            st.components.v1.html(html_text, height=600, scrolling=True)
 
 
 def _launch() -> None:
@@ -277,8 +316,3 @@ def _launch() -> None:
 
 if __name__ == "__main__":
     _launch()
-else:
-    from streamlit.runtime.scriptrunner import get_script_run_ctx
-
-    if get_script_run_ctx() is not None:
-        main()

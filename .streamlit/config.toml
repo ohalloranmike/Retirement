@@ -1,0 +1,7 @@
+# Local dev defaults (helps Linux desktops avoid blank/spinning UI in some setups).
+[server]
+headless = true
+address = "127.0.0.1"
+
+[browser]
+gatherUsageStats = false
