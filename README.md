@@ -37,6 +37,8 @@ python -m pip install -r requirements.txt
 .\run-streamlit.ps1
 ```
 
+Double-click **`run-gui.bat`** (Cmd) if PowerShell script policy blocks `.ps1` files.
+
 ## Desktop GUI (recommended — standalone)
 
 Self-contained Windows/Mac/Linux app (Tkinter, no browser). Enter all options, run the projection, then export Excel, CSV, HTML, charts, or **everything at once**:

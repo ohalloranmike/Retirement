@@ -40,7 +40,7 @@ In Cursor/VS Code: **Python: Select Interpreter** → `Retirement\.venv\Scripts\
 
 | If you want… | Use… |
 |--------------|------|
-| Desktop forms, charts, export menus | `python gui.py` or `.\run-gui.ps1` |
+| Desktop forms, charts, export menus | `run-gui.bat`, `.\run-gui.ps1`, or `python gui.py` |
 | Browser UI with sliders | `streamlit run streamlit_app.py` or `.\run-streamlit.ps1` |
 | Scripts, automation, CSV | `python main.py` (CLI) |
 | Spreadsheet inputs you already use | Excel `retirement_planner.xlsx` + `main.py --refresh` |
@@ -380,7 +380,7 @@ Load: `python main.py --config config\sample.json --summary`
 | Issue | Fix |
 |-------|-----|
 | `ModuleNotFoundError` | Use `.venv\Scripts\python.exe`; run `pip install -e .` |
-| “Must use local .venv” | Select `.venv` interpreter or use `run-gui.ps1` |
+| “Must use local .venv” | Select `.venv` interpreter or use `run-gui.bat` / `run-gui.ps1` |
 | GUI won’t export | Run projection first |
 | Results differ Excel vs JSON | Excel may lack v2 fields; align inputs or use JSON/GUI |
 
