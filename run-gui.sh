@@ -15,6 +15,12 @@ if [[ ! -x "${PYTHON}" ]]; then
   exit 1
 fi
 
+if ! "${PYTHON}" -c "import retirement" 2>/dev/null; then
+  echo "Installing dependencies into .venv (first run)..." >&2
+  "${PYTHON}" -m pip install -U pip
+  "${PYTHON}" -m pip install -e "${ROOT}"
+fi
+
 if [[ "$(uname -s)" == "Linux" ]] && command -v dpkg >/dev/null; then
   if ! dpkg -s python3-tk &>/dev/null; then
     echo "Note: python3-tk is not installed. The GUI needs it:" >&2

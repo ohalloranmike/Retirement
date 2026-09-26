@@ -3,9 +3,10 @@
 
 from __future__ import annotations
 
-from bootstrap_venv import relaunch_with_project_venv
+from bootstrap_venv import ensure_project_installed, relaunch_with_project_venv
 
 relaunch_with_project_venv(__file__)
+ensure_project_installed(__file__)
 
 import argparse
 import json

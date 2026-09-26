@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -11,6 +12,10 @@ _ENV_FLAG = "RETIREMENT_VENV_BOOTSTRAP"
 
 def _project_root(entry: str | Path) -> Path:
     return Path(entry).resolve().parent
+
+
+def _venv_bin_dir(root: Path) -> Path:
+    return root / ".venv" / ("Scripts" if sys.platform == "win32" else "bin")
 
 
 def _venv_python(bin_dir: Path) -> Path | None:
@@ -33,6 +38,29 @@ def _in_project_venv(executable: Path, bin_dir: Path) -> bool:
     return name == "python" or name.startswith("python3")
 
 
+def _python_can_import(python: Path, module: str) -> bool:
+    result = subprocess.run(
+        [str(python), "-c", f"import {module}"],
+        capture_output=True,
+        text=True,
+    )
+    return result.returncode == 0
+
+
+def ensure_project_installed(entry: str | Path, *, streamlit: bool = False) -> None:
+    """Run `pip install -e .` in the active interpreter if core deps are missing."""
+    root = _project_root(entry)
+    python = Path(sys.executable)
+    module = "streamlit" if streamlit else "retirement"
+    if _python_can_import(python, module):
+        return
+    print(f"Installing project dependencies into {python} (missing {module})...", file=sys.stderr)
+    subprocess.run(
+        [str(python), "-m", "pip", "install", "-e", str(root)],
+        check=True,
+    )
+
+
 def relaunch_with_project_venv(entry: str | Path, *, streamlit: bool = False) -> None:
     """
     If sys.executable is not the project .venv, replace this process with the venv interpreter.
@@ -43,7 +71,7 @@ def relaunch_with_project_venv(entry: str | Path, *, streamlit: bool = False) ->
         return
 
     root = _project_root(entry)
-    bin_dir = root / ".venv" / ("Scripts" if sys.platform == "win32" else "bin")
+    bin_dir = _venv_bin_dir(root)
     venv_py = _venv_python(bin_dir)
     if venv_py is None:
         return
@@ -54,6 +82,14 @@ def relaunch_with_project_venv(entry: str | Path, *, streamlit: bool = False) ->
             return
     except OSError:
         pass
+
+    module = "streamlit" if streamlit else "retirement"
+    if not _python_can_import(venv_py, module):
+        print(f"Installing project dependencies into {venv_py} (missing {module})...", file=sys.stderr)
+        subprocess.run(
+            [str(venv_py), "-m", "pip", "install", "-e", str(root)],
+            check=True,
+        )
 
     os.environ[_ENV_FLAG] = "1"
     script = Path(entry).resolve()

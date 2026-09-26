@@ -19,6 +19,13 @@ python3 -m venv .venv
 chmod +x run-gui.sh run-streamlit.sh
 ```
 
+The `run-*.sh` scripts (and the app bootstrap) will run `pip install -e .` automatically if Streamlit or the `retirement` package is missing from `.venv`.
+
+```bash
+# manual one-liner if you prefer
+.venv/bin/python -m pip install -e .
+```
+
 ## Launch
 
 | UI | Command |

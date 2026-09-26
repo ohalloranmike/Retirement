@@ -15,6 +15,12 @@ if [[ ! -x "${PYTHON}" ]]; then
   exit 1
 fi
 
+if ! "${PYTHON}" -c "import streamlit" 2>/dev/null; then
+  echo "Installing dependencies into .venv (first run)..." >&2
+  "${PYTHON}" -m pip install -U pip
+  "${PYTHON}" -m pip install -e "${ROOT}"
+fi
+
 export MPLBACKEND=Agg
 # Use 127.0.0.1 explicitly (matches .streamlit/config.toml).
 exec "${PYTHON}" -m streamlit run "${ROOT}/streamlit_app.py" --server.address=127.0.0.1
