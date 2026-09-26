@@ -4,6 +4,9 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PYTHON="${ROOT}/.venv/bin/python"
+if [[ ! -x "${PYTHON}" ]]; then
+  PYTHON="${ROOT}/.venv/bin/python3"
+fi
 
 if [[ ! -x "${PYTHON}" ]]; then
   echo "Missing .venv. From the project folder, run:" >&2
@@ -13,4 +16,5 @@ if [[ ! -x "${PYTHON}" ]]; then
 fi
 
 export MPLBACKEND=Agg
-exec "${PYTHON}" -m streamlit run "${ROOT}/streamlit_app.py"
+# Use 127.0.0.1 explicitly (matches .streamlit/config.toml).
+exec "${PYTHON}" -m streamlit run "${ROOT}/streamlit_app.py" --server.address=127.0.0.1

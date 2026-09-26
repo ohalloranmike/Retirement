@@ -1,7 +1,10 @@
-# Local dev defaults (helps Linux desktops avoid blank/spinning UI in some setups).
+# Local dev defaults (Linux Mint: avoids some blank/spinning pages with strict browsers).
 [server]
 headless = true
 address = "127.0.0.1"
+enableCORS = false
+enableXsrfProtection = false
 
 [browser]
 gatherUsageStats = false
+serverAddress = "127.0.0.1"

@@ -46,7 +46,7 @@ chmod +x run-streamlit.sh   # once
 ./run-streamlit.sh
 ```
 
-Open the URL Streamlit prints (usually **http://127.0.0.1:8501**). If the page shell loads but the runner icon spins forever, pull the latest code (matplotlib uses a headless backend on Linux) and check the terminal for Python errors. Try another browser or disable VPN/proxy for localhost.
+Open the URL Streamlit prints (**http://127.0.0.1:8501** — use `127.0.0.1`, not a machine hostname). If the runner icon keeps spinning: check the **terminal** for errors, try Chromium/Firefox, and disable VPN/proxy for localhost. After `git pull`, restart with `./run-streamlit.sh`.
 
 ## Desktop GUI (recommended — standalone)
 
