@@ -37,7 +37,7 @@ python -m pip install -r requirements.txt
 .\run-streamlit.ps1
 ```
 
-Double-click **`run-gui.bat`** (Cmd) if PowerShell script policy blocks `.ps1` files.
+Double-click **`run-gui.bat`** or **`run-streamlit.bat`** (Cmd) if PowerShell script policy blocks `.ps1` files.
 
 ## Desktop GUI (recommended — standalone)
 
@@ -54,6 +54,12 @@ python gui.py
 ## Streamlit app (optional)
 
 Browser-based UI with the same exports:
+
+```powershell
+.\run-streamlit.ps1
+```
+
+Or double-click **`run-streamlit.bat`**, or with the venv active:
 
 ```powershell
 streamlit run streamlit_app.py
