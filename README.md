@@ -88,6 +88,8 @@ python main.py --excel retirement_planner.xlsx --refresh --summary
 
 Opening `retirement_planner.xlsx` after `--init` includes charts on the Projection sheet.
 
+You can also download Excel from the **desktop GUI** or **Streamlit** (same Inputs + Projection idea). The `retirement_planner.xlsx` in the project folder is optional **local data** (your numbers after refresh or export); it is usually **not committed** to git. For full **v2** fields without Excel, use `config/sample_v2.json` or the GUI **Advanced (v2)** section (see [docs/features.md](docs/features.md)).
+
 ## Documentation
 
 - **[docs/features.md](docs/features.md)** — complete v1/v2 features, inputs, Roth pools, exports, limitations, troubleshooting

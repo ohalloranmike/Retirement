@@ -125,6 +125,8 @@ Same **Your plan** fields as the desktop GUI (including **Advanced (v2)**), buil
 
 Excel does **not** include every v2 field yet; for full v2 use JSON, GUI **Advanced (v2)**, or extend the workbook later.
 
+**Local file:** `retirement_planner.xlsx` in the repo root is a working copy for the Excel workflow. After you edit Inputs or export from the GUI/Streamlit, git may show it as modified—that is expected. Treat it as personal data; it is typically **not** pushed to GitHub. Committed samples for CLI/API are `config/sample.json` and `config/sample_v2.json`.
+
 ---
 
 ## 4. Core concepts (all versions)
