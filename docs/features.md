@@ -59,7 +59,7 @@ python main.py --summary
 python main.py --config config\sample_v2.json --summary --monte-carlo
 ```
 
-**GUI:** Open `gui.py` → adjust **Assumptions** → **Run projection** → **File** → export reports.
+**GUI:** Open `gui.py` → edit **Your plan** on the left (results update automatically) → **File** or **Save & print** tab to export reports.
 
 ### Step 4 — Save your assumptions
 
@@ -72,12 +72,20 @@ python main.py --config config\sample_v2.json --summary --monte-carlo
 
 ### 3.1 Desktop GUI (`gui.py`)
 
-- **Assumptions** panel: timeline, balances, savings, returns, pension, Social Security, spending, withdrawal order.
-- **Advanced (v2):** tax toggle, filing status, state, Roth pools, conversions, Monte Carlo trial count.
-- **Results:** Summary text, year-by-year table, charts.
-- **File menu:** Excel workbook, CSV, HTML report, chart PNGs, export all, open HTML in browser for print/PDF.
-- **View menu:** Dark / light theme (Sun Valley styling).
-- **Run** must complete before exports are enabled.
+CustomTkinter desktop app (Windows: `run-gui.bat` / `run-gui.ps1`; requires project `.venv`).
+
+**Layout (aligned with Streamlit):**
+
+- **Left — Your plan:** scrollable inputs for timeline, balances, savings, returns, pension, Social Security, spending, withdrawal order (radio buttons), and **Advanced (v2)** (tax toggle, filing status, state, Roth pools, conversions, Monte Carlo trial count).
+- **Right — tabs:** **Summary** (metrics and first retirement year), **Year-by-year** (table with **Year** and **Age** fixed while other columns scroll horizontally), **Charts**, **Save & print** (download buttons and print/PDF via browser).
+- **Splitter:** drag the vertical bar to resize the left panel; width is saved in `%APPDATA%\RetirementPlanner\gui_prefs.json` (Windows) or `~/.config/RetirementPlanner/gui_prefs.json` (Linux/macOS) and restored on the next launch.
+
+**Behavior:**
+
+- Results **recalculate automatically** after you change inputs (short debounce). **Run → Refresh now** forces an immediate update; **Run → Run projection** shows the Monte Carlo notice when trials are enabled.
+- **File menu:** load sample values, Excel / CSV / HTML / chart PNGs, export all to a folder, open HTML in browser for print/PDF, exit.
+- **View menu:** dark / light theme (Sun Valley + CustomTkinter styling).
+- Exports need a successful projection (invalid inputs show an error above the results tabs).
 
 ### 3.2 CLI (`main.py`)
 
@@ -219,7 +227,7 @@ Conversion adds **ordinary income** in that year and moves balance into the Roth
 | `run_monte_carlo_trials` | e.g. `500`; `0` = skip |
 | `monte_carlo_return_std` | Standard deviation of post-retirement return per trial |
 
-Each trial draws one post-retirement return (normal, clipped); success ≈ no cumulative shortfall in that trial’s deterministic path. GUI runs Monte Carlo when trial count > 0 after **Run projection**.
+Each trial draws one post-retirement return (normal, clipped); success ≈ no cumulative shortfall in that trial’s deterministic path. GUI runs Monte Carlo when trial count > 0 (use **Run → Run projection** for the notice, or wait for auto-refresh).
 
 ### v2 extra output columns
 
@@ -381,7 +389,7 @@ Load: `python main.py --config config\sample.json --summary`
 |-------|-----|
 | `ModuleNotFoundError` | Use `.venv\Scripts\python.exe`; run `pip install -e .` |
 | “Must use local .venv” | Select `.venv` interpreter or use `run-gui.bat` / `run-gui.ps1` |
-| GUI won’t export | Run projection first |
+| GUI won’t export | Fix input errors so auto-refresh succeeds, or use **Run → Refresh now** |
 | Results differ Excel vs JSON | Excel may lack v2 fields; align inputs or use JSON/GUI |
 
 ---
@@ -400,6 +408,8 @@ Load: `python main.py --config config\sample.json --summary`
 | `retirement/report.py` | HTML report and export bundle |
 | `retirement/excel_export.py` | Workbook create/refresh |
 | `gui.py` / `streamlit_app.py` / `main.py` | Entry points |
+| `retirement/gui_theme.py` | Desktop GUI fonts and ttk/Sun Valley theme |
+| `retirement/gui_prefs.py` | Persist desktop GUI layout (sidebar width) |
 | `retirement/venv_guard.py` | Enforce `.venv` only |
 
 ---
