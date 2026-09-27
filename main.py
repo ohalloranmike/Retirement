@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI for retirement cash-flow projection and Excel workbook."""
+"""CLI for retirement cash-flow projection (CSV, charts, JSON config)."""
 
 from __future__ import annotations
 
@@ -8,7 +8,6 @@ import json
 import sys
 from pathlib import Path
 
-from retirement.excel_export import create_workbook, refresh_projection_in_workbook
 from retirement.models import RetirementInputs
 from retirement.projection import default_sample_inputs, inputs_from_dict, run_projection
 from retirement.venv_guard import require_project_venv
@@ -17,13 +16,6 @@ from retirement.venv_guard import require_project_venv
 def main(argv: list[str] | None = None) -> int:
     require_project_venv()
     parser = argparse.ArgumentParser(description="Retirement income & balance planner (v1)")
-    parser.add_argument(
-        "--excel",
-        type=Path,
-        help="Path to .xlsx workbook (create with --init, refresh with --refresh)",
-    )
-    parser.add_argument("--init", action="store_true", help="Create a new Excel workbook with sample inputs")
-    parser.add_argument("--refresh", action="store_true", help="Re-run projection from Inputs sheet into workbook")
     parser.add_argument("--config", type=Path, help="JSON file with RetirementInputs fields")
     parser.add_argument("--csv", type=Path, help="Write projection CSV to this path")
     parser.add_argument("--charts", type=Path, help="Directory to write PNG charts")
@@ -35,38 +27,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    root = Path(__file__).resolve().parent
-    default_xlsx = root / "retirement_planner.xlsx"
-
-    if args.init:
-        excel_path = args.excel or default_xlsx
-        inputs = default_sample_inputs()
-        if args.config:
-            inputs = inputs_from_dict(json.loads(args.config.read_text(encoding="utf-8")))
-        create_workbook(excel_path, inputs)
-        print(f"Created workbook: {excel_path}")
-        return 0
-
-    if args.refresh and args.excel:
-        df = refresh_projection_in_workbook(args.excel)
-        print(f"Updated projection in {args.excel} ({len(df)} years)")
-        if args.summary:
-            _print_summary(df)
-        return 0
-
-    inputs: RetirementInputs | None = None
-    if args.excel and args.excel.exists():
-        df = refresh_projection_in_workbook(args.excel)
-        print(f"Using inputs from {args.excel}")
-    elif args.config:
+    if args.config:
         inputs = inputs_from_dict(json.loads(args.config.read_text(encoding="utf-8")))
         df = run_projection(inputs)
     else:
         inputs = default_sample_inputs()
         df = run_projection(inputs)
-        if not args.excel:
-            create_workbook(default_xlsx, inputs)
-            print(f"Wrote sample workbook: {default_xlsx}")
 
     if args.csv:
         df.to_csv(args.csv, index=False)
@@ -85,8 +51,6 @@ def main(argv: list[str] | None = None) -> int:
     if args.monte_carlo:
         from retirement.monte_carlo import run_monte_carlo
 
-        if inputs is None:
-            inputs = default_sample_inputs()
         trials = inputs.run_monte_carlo_trials if inputs.run_monte_carlo_trials > 0 else 0
         if trials <= 0:
             trials = 1000

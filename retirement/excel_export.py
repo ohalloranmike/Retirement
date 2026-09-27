@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
-
 import pandas as pd
 from openpyxl import Workbook
 from openpyxl.chart import BarChart, LineChart, Reference
@@ -56,33 +54,6 @@ def _style_header(ws, row: int, ncol: int) -> None:
         cell.alignment = Alignment(horizontal="center")
 
 
-def inputs_from_workbook(wb_path: Path) -> RetirementInputs:
-    from openpyxl import load_workbook
-
-    wb = load_workbook(wb_path, data_only=True)
-    ws = wb["Inputs"]
-    data: dict[str, Any] = {}
-    for row in range(2, 2 + len(INPUT_LABELS)):
-        key = ws.cell(row=row, column=1).value
-        val = ws.cell(row=row, column=3).value
-        if key is None:
-            continue
-        if key == "ira_is_roth":
-            data[key] = str(val).upper() in ("TRUE", "1", "YES")
-        elif key == "withdrawal_order":
-            data[key] = WithdrawalOrder(str(val))
-        elif isinstance(val, bool):
-            data[key] = val
-        elif isinstance(val, (int, float)):
-            if key in ("birth_year", "retirement_age", "life_expectancy_age", "planning_start_year", "pension_start_age", "ss_claim_age", "ss_fra_age", "spouse_ss_claim_age"):
-                data[key] = int(val)
-            else:
-                data[key] = float(val)
-        else:
-            data[key] = val
-    return RetirementInputs(**data)
-
-
 def create_workbook(path: Path, inputs: RetirementInputs | None = None) -> Path:
     inputs = inputs or RetirementInputs(
         birth_year=1965,
@@ -125,10 +96,10 @@ def create_workbook(path: Path, inputs: RetirementInputs | None = None) -> Path:
     ws_help = wb.create_sheet("Instructions")
     ws_help["A1"] = "Retirement Planner (v1)"
     ws_help["A3"] = (
-        "1. Edit yellow cells on Inputs.\n"
-        "2. Run: python main.py --excel \"path\\to\\this_file.xlsx\" --refresh\n"
-        "   Or: python main.py (uses built-in sample) and open generated projection.\n"
-        "3. Projection sheet is refreshed by Python (RMD, SS, withdrawal order).\n"
+        "This workbook was exported from Retirement Planner (desktop GUI or Streamlit).\n"
+        "1. Inputs — snapshot of assumptions at export time.\n"
+        "2. Projection — year-by-year results computed in Python (not Excel formulas).\n"
+        "3. To change assumptions, edit them in the app and export Excel again.\n"
         "4. Not tax advice; SS/pension are simplified models."
     )
     ws_help["A3"].alignment = Alignment(wrap_text=True)
@@ -138,20 +109,6 @@ def create_workbook(path: Path, inputs: RetirementInputs | None = None) -> Path:
 
     wb.save(path)
     return path
-
-
-def refresh_projection_in_workbook(path: Path) -> pd.DataFrame:
-    path = Path(path)
-    inputs = inputs_from_workbook(path)
-    df = run_projection(inputs)
-    from openpyxl import load_workbook
-
-    wb = load_workbook(path)
-    if "Projection" in wb.sheetnames:
-        del wb["Projection"]
-    _write_projection_sheet(wb, df)
-    wb.save(path)
-    return df
 
 
 def _write_projection_sheet(wb: Workbook, df: pd.DataFrame) -> None:

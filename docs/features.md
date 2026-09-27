@@ -43,7 +43,7 @@ In Cursor/VS Code: **Python: Select Interpreter** → `Retirement\.venv\Scripts\
 | Desktop forms, charts, export menus | `run-gui.bat`, `.\run-gui.ps1`, or `python gui.py` |
 | Browser UI with sliders | `streamlit run streamlit_app.py` or `.\run-streamlit.ps1` |
 | Scripts, automation, CSV | `python main.py` (CLI) |
-| Spreadsheet inputs you already use | Excel `retirement_planner.xlsx` + `main.py --refresh` |
+| Excel workbook export | GUI **File → Export Excel…** or Streamlit **Download Excel** |
 
 ### Step 3 — Run a first projection
 
@@ -103,9 +103,6 @@ CustomTkinter desktop app (Windows: `run-gui.bat` / `run-gui.ps1`; requires proj
 | `--csv path` | Write projection table |
 | `--charts folder` | Write income and balance PNG charts |
 | `--monte-carlo` | Run Monte Carlo after deterministic plan |
-| `--init --excel file.xlsx` | Create Excel workbook with sample inputs |
-| `--excel file.xlsx --refresh` | Recompute **Projection** sheet from **Inputs** |
-
 ### 3.3 Streamlit (`streamlit_app.py`)
 
 Same **Your plan** fields as the desktop GUI (including **Advanced (v2)**), built via `retirement/ui_inputs.py`. Tabs: **Summary** (on-demand Monte Carlo when trials &gt; 0), **Year-by-year**, **Charts**, **Save & print**. Same `run_projection` and report exports as CLI/GUI.
@@ -117,15 +114,20 @@ Same **Your plan** fields as the desktop GUI (including **Advanced (v2)**), buil
 
 **Sidebar:** expanders match the desktop sections; the sidebar width follows the browser like Streamlit’s built-in layout.
 
-### 3.4 Excel workbook
+### 3.4 Excel export (GUI / Streamlit only)
 
-- **Inputs** sheet: edit assumptions (labels in column B, values in column C).
-- **Projection** sheet: written by Python (not Excel formulas) so RMD, SS, and v2 tax logic stay correct.
-- Refresh: `python main.py --excel retirement_planner.xlsx --refresh`
+Excel is an **output format**, not a way to drive the model from the command line.
 
-Excel does **not** include every v2 field yet; for full v2 use JSON, GUI **Advanced (v2)**, or extend the workbook later.
+- **Desktop:** **File → Export Excel workbook…** (or **Save & print → Download Excel**).
+- **Streamlit:** **Save & print → Download Excel** (default name `retirement_planner.xlsx`).
+- **Export all** (GUI folder bundle) also writes Excel alongside CSV, HTML, and charts.
 
-**Local file:** `retirement_planner.xlsx` in the repo root is a working copy for the Excel workflow. After you edit Inputs or export from the GUI/Streamlit, git may show it as modified—that is expected. Treat it as personal data; it is typically **not** pushed to GitHub. Committed samples for CLI/API are `config/sample.json` and `config/sample_v2.json`.
+Each exported file includes:
+
+- **Inputs** — snapshot of assumptions at export time (column B labels, column C values).
+- **Projection** — year-by-year results written by Python (not Excel formulas).
+
+To update a workbook after changing assumptions, export again from the app. Excel does **not** include every v2 field yet; for full v2 modeling use the GUI **Advanced (v2)** section or `config/sample_v2.json`. Saved `.xlsx` files are personal output (listed in `.gitignore` if saved in the project folder).
 
 ---
 
@@ -194,7 +196,7 @@ Common columns include year, age, phase, balances, contributions, growth, withdr
 | Withdrawal strategies | Three ordering modes |
 | Inflation | On spending goal (and pension display via plan logic) |
 | Reports | Summary, CSV, Excel, HTML, charts |
-| Three UIs | GUI, Streamlit, CLI + Excel refresh |
+| Three UIs | GUI, Streamlit, CLI (JSON/CSV/charts; Excel via GUI/Streamlit export) |
 
 **v1 does not** model income tax, IRMAA, Roth conversions, or return uncertainty unless v2 is enabled.
 
@@ -371,7 +373,7 @@ Code: `retirement/roth_pools.py`, integrated in `retirement/projection.py`.
 | Export | Contents |
 |--------|----------|
 | **CSV** | Year-by-year table (friendly column names in HTML/CSV report path) |
-| **Excel** | Inputs sheet + Projection (+ charts on sheet when generated via tool) |
+| **Excel** | GUI/Streamlit export: Inputs snapshot + Projection sheet |
 | **HTML** | Summary, assumptions, embedded charts, full table — good for print/PDF |
 | **PNG charts** | Income-by-source vs spending; total balance over time |
 | **Export all** (GUI) | CSV + HTML + Excel + charts in one folder |
@@ -395,7 +397,7 @@ Load: `python main.py --config config\sample.json --summary`
 - No NIIT, AMT, detailed state schedules, ACA subsidies, or variable “go-go / slow-go” spending.
 - Monte Carlo is a simplified return draw, not full correlated asset-class simulation.
 - Not a substitute for MoneyGuide, eMoney, or CPA-prepared tax projections.
-- Excel input sheet does not expose all v2 fields.
+- Excel export does not include all v2 input fields on the Inputs sheet.
 
 ---
 
@@ -406,7 +408,7 @@ Load: `python main.py --config config\sample.json --summary`
 | `ModuleNotFoundError` | Use `.venv\Scripts\python.exe`; run `pip install -e .` |
 | “Must use local .venv” | Select `.venv` interpreter or use `run-gui.bat` / `run-gui.ps1` |
 | GUI won’t export | Fix input errors so auto-refresh succeeds, or use **Run → Refresh now** |
-| Results differ Excel vs JSON | Excel may lack v2 fields; align inputs or use JSON/GUI |
+| Results differ Excel vs JSON | Re-export from GUI after changing v2 fields; Excel Inputs sheet may omit some v2 keys |
 
 ---
 
@@ -422,7 +424,7 @@ Load: `python main.py --config config\sample.json --summary`
 | `retirement/tax/` | Federal, state, SS tax, IRMAA |
 | `retirement/monte_carlo.py` | Trial success rate |
 | `retirement/report.py` | `report_dataframe`, HTML/CSV export, `format_yearly_table_parts`, column labels |
-| `retirement/excel_export.py` | Workbook create/refresh |
+| `retirement/excel_export.py` | Build Excel files for GUI/Streamlit export |
 | `gui.py` / `streamlit_app.py` / `main.py` | Entry points |
 | `retirement/gui_theme.py` | Desktop GUI fonts and ttk/Sun Valley theme |
 | `retirement/gui_prefs.py` | Persist desktop GUI layout (sidebar width) |

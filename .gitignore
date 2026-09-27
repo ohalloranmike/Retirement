@@ -10,5 +10,6 @@ build/
 .pytest_cache/
 .mypy_cache/
 output/
+retirement_planner.xlsx
 *.png
 .idea/

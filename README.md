@@ -72,23 +72,9 @@ python main.py --summary
 python main.py --config config\sample.json --csv output\projection.csv --charts output\charts
 ```
 
-## Excel workbook
+## Excel export
 
-Create a workbook with an **Inputs** sheet and a **Projection** sheet (projection is computed in Python because RMD/SS/withdrawal logic is easier to maintain in code):
-
-```bash
-python main.py --init --excel retirement_planner.xlsx
-```
-
-Edit values on the **Inputs** sheet, then refresh:
-
-```bash
-python main.py --excel retirement_planner.xlsx --refresh --summary
-```
-
-Opening `retirement_planner.xlsx` after `--init` includes charts on the Projection sheet.
-
-You can also download Excel from the **desktop GUI** or **Streamlit** (same Inputs + Projection idea). The `retirement_planner.xlsx` in the project folder is optional **local data** (your numbers after refresh or export); it is usually **not committed** to git. For full **v2** fields without Excel, use `config/sample_v2.json` or the GUI **Advanced (v2)** section (see [docs/features.md](docs/features.md)).
+Excel workbooks are **exports only** — use the **desktop GUI** (**File → Export Excel…**) or **Streamlit** (**Download Excel**). Each file has an **Inputs** sheet (assumptions at export time) and a **Projection** sheet (year-by-year results computed in Python, not Excel formulas). Change assumptions in the app and export again to update. See [docs/features.md](docs/features.md) for v2 field coverage on Excel exports.
 
 ## Documentation
 
@@ -107,7 +93,7 @@ python main.py --config config\sample_v2.json --summary --monte-carlo
 - `retirement/projection.py` — year loop, withdrawals, RMD floor
 - `retirement/rmd.py` — SECURE 2.0 start age and uniform lifetime table
 - `retirement/social_security.py` — early/late claiming adjustments + COLA
-- `retirement/excel_export.py` — workbook create/refresh
+- `retirement/excel_export.py` — Excel export (GUI / Streamlit / export bundle)
 - `gui.py` — standalone desktop GUI (main interactive program)
 - `streamlit_app.py` — optional browser UI
 - `retirement/report.py` — summary metrics and HTML report
