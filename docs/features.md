@@ -76,9 +76,16 @@ CustomTkinter desktop app (Windows: `run-gui.bat` / `run-gui.ps1`; requires proj
 
 **Layout (aligned with Streamlit):**
 
-- **Left — Your plan:** scrollable inputs for timeline, balances, savings, returns, pension, Social Security, spending, withdrawal order (radio buttons), and **Advanced (v2)** (tax toggle, filing status, state, Roth pools, conversions, Monte Carlo trial count).
-- **Right — tabs:** **Summary** (metrics and first retirement year), **Year-by-year** (table with **Year** and **Age** fixed while other columns scroll horizontally), **Charts**, **Save & print** (download buttons and print/PDF via browser).
-- **Splitter:** drag the vertical bar to resize the left panel; width is saved in `%APPDATA%\RetirementPlanner\gui_prefs.json` (Windows) or `~/.config/RetirementPlanner/gui_prefs.json` (Linux/macOS) and restored on the next launch.
+- **Left — Your plan:** scrollable inputs for timeline, balances, savings, returns, pension, Social Security, spending, withdrawal order (radio buttons), and **Advanced (v2)** (tax toggle, filing status, state, Roth pools, conversions, Monte Carlo trial count). Long labels **wrap** as you widen the pane (similar to Streamlit’s sidebar).
+- **Right — tabs:** **Summary** (metrics and first retirement year), **Year-by-year**, **Charts**, **Save & print** (download buttons and print/PDF via browser).
+- **Splitter:** drag the vertical bar to resize the left panel; width is saved in `%APPDATA%\RetirementPlanner\gui_prefs.json` (Windows) or `~/.config/RetirementPlanner/gui_prefs.json` (Linux/macOS) and restored on the next launch (including when you exit with the window **X** or **File → Exit**).
+
+**Year-by-year (desktop):**
+
+- **Year** and **Age** stay fixed on the left; other columns scroll horizontally.
+- **Column list** above the table: multi-select listbox (**Ctrl**/**Shift** click), **All** / **None** buttons. Defaults to **all** report columns selected. Same column set as Streamlit (from `report_dataframe` / `DISPLAY_COLUMNS`).
+
+**Input parity:** `collect_inputs()` in `gui.py` and the Streamlit sidebar both call `retirement/ui_inputs.build_retirement_inputs()` with the same fields.
 
 **Behavior:**
 
@@ -101,7 +108,14 @@ CustomTkinter desktop app (Windows: `run-gui.bat` / `run-gui.ps1`; requires proj
 
 ### 3.3 Streamlit (`streamlit_app.py`)
 
-Same **Your plan** fields as the desktop GUI (including **Advanced (v2)**), built via `retirement/ui_inputs.py`. Tabs: Summary (with on-demand Monte Carlo when trials &gt; 0), Year-by-year, Charts, Save & print. Same `run_projection` / report exports as CLI/GUI.
+Same **Your plan** fields as the desktop GUI (including **Advanced (v2)**), built via `retirement/ui_inputs.py`. Tabs: **Summary** (on-demand Monte Carlo when trials &gt; 0), **Year-by-year**, **Charts**, **Save & print**. Same `run_projection` and report exports as CLI/GUI.
+
+**Year-by-year (browser):**
+
+- **Year** and **Age** pinned on the left while you scroll horizontally (HTML table; no spurious row index).
+- **Columns** multiselect lists every scrollable report column; **all are selected by default**. Year/Age are always shown and are not in the multiselect list.
+
+**Sidebar:** expanders match the desktop sections; the sidebar width follows the browser like Streamlit’s built-in layout.
 
 ### 3.4 Excel workbook
 
@@ -405,7 +419,7 @@ Load: `python main.py --config config\sample.json --summary`
 | `retirement/roth_pools.py` | Roth post-tax / pre-tax pools |
 | `retirement/tax/` | Federal, state, SS tax, IRMAA |
 | `retirement/monte_carlo.py` | Trial success rate |
-| `retirement/report.py` | HTML report and export bundle |
+| `retirement/report.py` | `report_dataframe`, HTML/CSV export, `format_yearly_table_parts`, column labels |
 | `retirement/excel_export.py` | Workbook create/refresh |
 | `gui.py` / `streamlit_app.py` / `main.py` | Entry points |
 | `retirement/gui_theme.py` | Desktop GUI fonts and ttk/Sun Valley theme |

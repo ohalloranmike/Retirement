@@ -1,0 +1,15 @@
+---
+description: Update user-facing docs before any git push to GitHub
+alwaysApply: true
+---
+
+# Documentation before push
+
+When the user asks to push to GitHub (or you are about to `git push` after feature work):
+
+1. **Update `docs/features.md`** if behavior, UI, inputs, exports, launchers, or module layout changed. Keep §3 (interfaces) and §13 (code map) in sync with the code.
+2. **Do not commit** local-only artifacts (e.g. `retirement_planner.xlsx`) unless the user explicitly requests it.
+3. **Include doc changes in the same push** as the code (separate commit is fine, but push both together).
+4. In the summary to the user, note what was documented if it was not obvious from the commit message.
+
+If the change is docs-only or trivial typo, still verify `features.md` does not contradict the code.
