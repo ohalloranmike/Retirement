@@ -31,11 +31,18 @@ PALETTE = {
 }
 
 FONT_FAMILY = "Segoe UI" if sys.platform == "win32" else "Helvetica Neue"
-FONT_UI = (FONT_FAMILY, 10)
-FONT_UI_SMALL = (FONT_FAMILY, 9)
-FONT_HEADING = (FONT_FAMILY, 18, "bold")
-FONT_SECTION = (FONT_FAMILY, 10, "bold")
-FONT_MONO = ("Cascadia Mono", 10) if sys.platform == "win32" else ("Menlo", 10)
+# CustomTkinter widgets default to 13px; match that everywhere for consistency.
+FONT_CTK_SIZE = 13
+FONT_UI = (FONT_FAMILY, FONT_CTK_SIZE)
+FONT_UI_SMALL = (FONT_FAMILY, FONT_CTK_SIZE)
+FONT_HEADING = (FONT_FAMILY, FONT_CTK_SIZE, "bold")
+FONT_SECTION = (FONT_FAMILY, FONT_CTK_SIZE, "bold")
+# tk.Menu uses points and does not follow CTk scaling; gui._menu_font() computes size.
+FONT_MENU_MIN_PT = 16
+FONT_TABLE_DISPLAY = FONT_CTK_SIZE  # tk.Text: use negative size (pixels) in gui
+FONT_TABLE = (FONT_FAMILY, FONT_CTK_SIZE)
+FONT_TABLE_HEADING = (FONT_FAMILY, FONT_CTK_SIZE, "bold")
+TREE_ROW_HEIGHT = 32
 
 
 def apply_theme(root: tk.Misc, theme: str = "light") -> dict[str, str]:
@@ -72,22 +79,25 @@ def apply_theme(root: tk.Misc, theme: str = "light") -> dict[str, str]:
     style.configure("Heading.TLabel", font=FONT_HEADING, foreground=colors["text_fg"])
     style.configure("TLabelframe.Label", font=FONT_SECTION)
     style.configure("TButton", padding=(10, 6))
-    style.configure("Accent.TButton", padding=(14, 8), font=(FONT_FAMILY, 10, "bold"))
+    style.configure("Accent.TButton", padding=(14, 8), font=(FONT_FAMILY, FONT_CTK_SIZE, "bold"))
     style.configure("TNotebook", padding=2)
     style.configure("TNotebook.Tab", padding=(14, 8), font=FONT_UI)
-    style.configure("Treeview", rowheight=26, font=FONT_UI_SMALL)
-    style.configure("Treeview.Heading", font=(FONT_FAMILY, 9, "bold"))
+    style.configure("Treeview", rowheight=TREE_ROW_HEIGHT, font=FONT_TABLE)
+    style.configure("Treeview.Heading", font=FONT_TABLE_HEADING)
+    style.configure("Results.Treeview", rowheight=TREE_ROW_HEIGHT, font=FONT_TABLE)
+    style.configure("Results.Treeview.Heading", font=FONT_TABLE_HEADING)
     style.configure("TEntry", padding=4)
 
     if theme == "light":
         style.configure("TFrame", background=colors["window"])
         style.configure("TLabelframe", background=colors["window"])
-        style.configure(
-            "Treeview",
-            background="#e8ecf1",
-            fieldbackground="#e8ecf1",
-            foreground=colors["text_fg"],
-        )
-        style.map("Treeview", background=[("selected", "#b8cce8")], foreground=[("selected", "#1e3a5f")])
+        for name in ("Treeview", "Results.Treeview"):
+            style.configure(
+                name,
+                background="#e8ecf1",
+                fieldbackground="#e8ecf1",
+                foreground=colors["text_fg"],
+            )
+            style.map(name, background=[("selected", "#b8cce8")], foreground=[("selected", "#1e3a5f")])
 
     return colors
