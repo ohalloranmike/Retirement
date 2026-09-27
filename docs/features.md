@@ -101,7 +101,7 @@ CustomTkinter desktop app (Windows: `run-gui.bat` / `run-gui.ps1`; requires proj
 
 ### 3.3 Streamlit (`streamlit_app.py`)
 
-Sidebar inputs, tabs for summary/table/charts, download CSV/Excel/HTML. Same projection engine as CLI/GUI.
+Same **Your plan** fields as the desktop GUI (including **Advanced (v2)**), built via `retirement/ui_inputs.py`. Tabs: Summary (with on-demand Monte Carlo when trials &gt; 0), Year-by-year, Charts, Save & print. Same `run_projection` / report exports as CLI/GUI.
 
 ### 3.4 Excel workbook
 
@@ -410,6 +410,7 @@ Load: `python main.py --config config\sample.json --summary`
 | `gui.py` / `streamlit_app.py` / `main.py` | Entry points |
 | `retirement/gui_theme.py` | Desktop GUI fonts and ttk/Sun Valley theme |
 | `retirement/gui_prefs.py` | Persist desktop GUI layout (sidebar width) |
+| `retirement/ui_inputs.py` | Shared `RetirementInputs` construction for GUI and Streamlit |
 | `retirement/venv_guard.py` | Enforce `.venv` only |
 
 ---

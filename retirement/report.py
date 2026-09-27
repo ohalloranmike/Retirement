@@ -56,11 +56,43 @@ DISPLAY_COLUMNS: list[tuple[str, str]] = [
 ]
 
 
+YEARLY_FIXED_LABELS: tuple[str, ...] = ("Year", "Age")
+
+
 def report_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     cols = [c for c, _ in DISPLAY_COLUMNS if c in df.columns]
     out = df[cols].copy()
     out.columns = [label for c, label in DISPLAY_COLUMNS if c in df.columns]
     return out
+
+
+def yearly_scroll_column_names(table: pd.DataFrame) -> list[str]:
+    return [c for c in table.columns if c not in YEARLY_FIXED_LABELS]
+
+
+def format_yearly_table_parts(
+    df: pd.DataFrame,
+    scroll_columns: list[str] | None = None,
+) -> tuple[str, str]:
+    """Fixed Year/Age text plus scrollable columns (desktop year-by-year table)."""
+    table = report_dataframe(df)
+    money_cols = {c for c in table.columns if c not in YEARLY_FIXED_LABELS and c != "Phase"}
+    fixed_lines = [f"{'Year':>6}  {'Age':>4}"]
+    for _, row in table.iterrows():
+        year = row["Year"] if "Year" in row else ""
+        age = row["Age"] if "Age" in row else ""
+        fixed_lines.append(f"{year!s:>6}  {age!s:>4}")
+    available = yearly_scroll_column_names(table)
+    if scroll_columns is None:
+        chosen = available
+    else:
+        chosen = [c for c in scroll_columns if c in available]
+    scroll = table[chosen].copy() if chosen else table[[]].copy()
+    for col in scroll.columns:
+        if col in money_cols:
+            scroll[col] = scroll[col].map(lambda v: f"${float(v):,.0f}" if pd.notna(v) else "")
+    scroll_text = scroll.to_string(index=False, col_space=12) if len(scroll.columns) else ""
+    return "\n".join(fixed_lines), scroll_text
 
 
 def _fmt_money(v: float) -> str:

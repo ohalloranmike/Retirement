@@ -23,44 +23,34 @@ from retirement.charts import balance_chart_figure, income_chart_figure
 from retirement.gui_prefs import get_sidebar_sash_fraction, set_sidebar_sash_fraction
 from retirement.gui_theme import FONT_CTK_SIZE, FONT_FAMILY, FONT_MENU_MIN_PT, FONT_TABLE_DISPLAY, apply_theme
 from retirement.venv_guard import require_project_venv
-from retirement.models import RetirementInputs, WithdrawalOrder
+from retirement.models import RetirementInputs
+from retirement.ui_inputs import (
+    WITHDRAWAL_LABELS,
+    build_retirement_inputs,
+    parse_float as _parse_float,
+    parse_int as _parse_int,
+    withdrawal_order_from_label,
+)
 from retirement.projection import default_sample_inputs, run_projection
 from retirement.report import (
     build_html_report,
     export_report_bundle,
+    format_yearly_table_parts,
     report_dataframe,
     save_excel,
     summarize_projection,
+    yearly_scroll_column_names,
 )
 
 def _ui_font(weight: str = "normal") -> ctk.CTkFont:
     return ctk.CTkFont(size=FONT_CTK_SIZE, weight=weight)
 
 
-# CTkScrollableFrame defaults to width=200; inner content must match a real sidebar width.
-_SIDEBAR_SCROLL_WIDTH = 440
-_SIDEBAR_WRAP = 400
-# CTk radio/checkbox default width=100; long labels need explicit width (within sidebar).
-_SIDEBAR_OPTION_WIDTH = 390
-_SIDEBAR_PANE_MINSIZE = 420
+# CTkScrollableFrame defaults to width=200; real width is synced to the paned left pane.
+_SIDEBAR_SCROLL_WIDTH_DEFAULT = 440
+_SIDEBAR_WRAP_DEFAULT = 400
+_SIDEBAR_PANE_MINSIZE = 320
 _RESULTS_PANE_MINSIZE = 360
-
-
-def _format_yearly_table_parts(df: pd.DataFrame) -> tuple[str, str]:
-    table = report_dataframe(df)
-    money_cols = {c for c in table.columns if c not in ("Year", "Age", "Phase")}
-    fixed_lines = [f"{'Year':>6}  {'Age':>4}"]
-    for _, row in table.iterrows():
-        year = row["Year"] if "Year" in row else ""
-        age = row["Age"] if "Age" in row else ""
-        fixed_lines.append(f"{year!s:>6}  {age!s:>4}")
-    scroll_cols = [c for c in table.columns if c not in ("Year", "Age")]
-    scroll = table[scroll_cols].copy()
-    for col in scroll.columns:
-        if col in money_cols:
-            scroll[col] = scroll[col].map(lambda v: f"${float(v):,.0f}" if pd.notna(v) else "")
-    scroll_text = scroll.to_string(index=False, col_space=12)
-    return "\n".join(fixed_lines), scroll_text
 
 
 _TOOLBAR_SECONDARY_BTN: dict[str, Any] = {
@@ -73,45 +63,27 @@ _TOOLBAR_SECONDARY_BTN: dict[str, Any] = {
     "hover_color": ("#d8dce3", "#404448"),
 }
 
-WITHDRAWAL_LABELS: dict[str, WithdrawalOrder] = {
-    "Taxable, then traditional, then Roth": WithdrawalOrder.TAXABLE_TRADITIONAL_ROTH,
-    "Traditional, then taxable, then Roth": WithdrawalOrder.TRADITIONAL_TAXABLE_ROTH,
-    "Proportional across accounts": WithdrawalOrder.PROPORTIONAL,
-}
-
-
-def _parse_float(text: str, field: str) -> float:
-    raw = text.strip().replace(",", "").replace("$", "")
-    if not raw:
-        return 0.0
-    try:
-        return float(raw)
-    except ValueError:
-        raise ValueError(f"{field} must be a number.") from None
-
-
-def _parse_int(text: str, field: str) -> int:
-    raw = text.strip().replace(",", "")
-    if not raw:
-        raise ValueError(f"{field} is required.")
-    try:
-        return int(float(raw))
-    except ValueError:
-        raise ValueError(f"{field} must be a whole number.") from None
-
-
 class LabeledEntry(ctk.CTkFrame):
-    def __init__(self, master: tk.Misc, label: str, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        master: tk.Misc,
+        label: str,
+        wrap_labels: list[ctk.CTkLabel] | None = None,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(master, fg_color="transparent", **kwargs)
         self.var = tk.StringVar()
-        ctk.CTkLabel(
+        field_label = ctk.CTkLabel(
             self,
             text=label,
             anchor="w",
             justify="left",
-            wraplength=_SIDEBAR_WRAP,
+            wraplength=_SIDEBAR_WRAP_DEFAULT,
             font=_ui_font(),
-        ).pack(fill="x", pady=(0, 1))
+        )
+        field_label.pack(fill="x", pady=(0, 1))
+        if wrap_labels is not None:
+            wrap_labels.append(field_label)
         ctk.CTkEntry(
             self,
             textvariable=self.var,
@@ -147,6 +119,12 @@ class RetirementPlannerApp(ctk.CTk):
         self._withdrawal_var = tk.StringVar(value=list(WITHDRAWAL_LABELS.keys())[0])
         self._filing_var = tk.StringVar(value="single")
         self._refresh_job: str | None = None
+        self._sidebar_persist_job: str | None = None
+        self._sidebar_layout_job: str | None = None
+        self._inputs_outer: ctk.CTkFrame | None = None
+        self._inputs_frame: ctk.CTkScrollableFrame | None = None
+        self._sidebar_wrap_labels: list[ctk.CTkLabel] = []
+        self._sidebar_option_widgets: list[ctk.CTkBaseClass] = []
         self._closing = False
         self._input_error_label: ctk.CTkLabel | None = None
         self._metric_labels: dict[str, ctk.CTkLabel] = {}
@@ -156,6 +134,7 @@ class RetirementPlannerApp(ctk.CTk):
         self._table_scroll: tk.Text | None = None
         self._table_vsb: ttk.Scrollbar | None = None
         self._table_hsb: ttk.Scrollbar | None = None
+        self._table_col_listbox: tk.Listbox | None = None
         self._table_tkfont: tkfont.Font | None = None
         self._paned: tk.PanedWindow | None = None
 
@@ -186,18 +165,87 @@ class RetirementPlannerApp(ctk.CTk):
             if frac is not None:
                 sash_x = int(total * frac)
             else:
-                sash_x = _SIDEBAR_SCROLL_WIDTH + 36
+                sash_x = _SIDEBAR_SCROLL_WIDTH_DEFAULT + 36
             sash_x = self._clamp_sidebar_sash_x(sash_x, total)
             self._paned.sash_place(0, sash_x, 0)
+            self._schedule_sidebar_layout_sync()
         except tk.TclError:
             pass
+
+    def _register_sidebar_wrap(self, label: ctk.CTkLabel) -> ctk.CTkLabel:
+        self._sidebar_wrap_labels.append(label)
+        return label
+
+    def _register_sidebar_option(self, widget: ctk.CTkBaseClass) -> ctk.CTkBaseClass:
+        self._sidebar_option_widgets.append(widget)
+        return widget
+
+    def _schedule_sidebar_layout_sync(self, *_args: object) -> None:
+        if self._closing:
+            return
+        if self._sidebar_layout_job is not None:
+            try:
+                self.after_cancel(self._sidebar_layout_job)
+            except tk.TclError:
+                pass
+        try:
+            self._sidebar_layout_job = self.after(50, self._sync_sidebar_layout)
+        except tk.TclError:
+            self._sidebar_layout_job = None
+
+    def _sync_sidebar_layout(self) -> None:
+        self._sidebar_layout_job = None
+        if self._closing or not self._inputs_outer or not self._inputs_frame:
+            return
+        try:
+            outer_w = self._inputs_outer.winfo_width()
+        except tk.TclError:
+            return
+        if outer_w < 120:
+            return
+        scale = ctk.ScalingTracker.get_widget_scaling(self)
+        logical = max(260, int((outer_w - 16) / scale))
+        wrap = max(200, logical - 40)
+        option_w = max(200, logical - 28)
+        try:
+            self._inputs_frame.configure(width=logical)
+        except (tk.TclError, ValueError):
+            pass
+        for label in self._sidebar_wrap_labels:
+            try:
+                label.configure(wraplength=wrap)
+            except tk.TclError:
+                pass
+        for widget in self._sidebar_option_widgets:
+            try:
+                widget.configure(width=option_w)
+            except tk.TclError:
+                pass
 
     def _clamp_sidebar_sash_x(self, sash_x: int, total_width: int) -> int:
         sash_w = 6
         max_x = total_width - _RESULTS_PANE_MINSIZE - sash_w
         return max(_SIDEBAR_PANE_MINSIZE, min(sash_x, max_x))
 
+    def _on_paned_interact(self, *_args: object) -> None:
+        self._schedule_persist_sidebar_width()
+        self._schedule_sidebar_layout_sync()
+
+    def _schedule_persist_sidebar_width(self, *_args: object) -> None:
+        if self._closing:
+            return
+        if self._sidebar_persist_job is not None:
+            try:
+                self.after_cancel(self._sidebar_persist_job)
+            except tk.TclError:
+                pass
+        try:
+            self._sidebar_persist_job = self.after(200, self._persist_sidebar_width)
+        except tk.TclError:
+            self._sidebar_persist_job = None
+
     def _persist_sidebar_width(self, *_args: object) -> None:
+        self._sidebar_persist_job = None
         if self._closing or not self._paned:
             return
         try:
@@ -212,14 +260,26 @@ class RetirementPlannerApp(ctk.CTk):
     def _on_close(self) -> None:
         if self._closing:
             return
-        self._closing = True
         self._persist_sidebar_width()
+        self._closing = True
         if self._refresh_job is not None:
             try:
                 self.after_cancel(self._refresh_job)
             except tk.TclError:
                 pass
             self._refresh_job = None
+        if self._sidebar_persist_job is not None:
+            try:
+                self.after_cancel(self._sidebar_persist_job)
+            except tk.TclError:
+                pass
+            self._sidebar_persist_job = None
+        if self._sidebar_layout_job is not None:
+            try:
+                self.after_cancel(self._sidebar_layout_job)
+            except tk.TclError:
+                pass
+            self._sidebar_layout_job = None
         for canvas in self._chart_canvases:
             try:
                 plt.close(canvas.figure)
@@ -380,17 +440,21 @@ class RetirementPlannerApp(ctk.CTk):
         )
         self._paned.pack(fill="both", expand=True, padx=12, pady=(0, 12))
 
-        inputs_outer = ctk.CTkFrame(self._paned, corner_radius=12)
-        self._paned.add(inputs_outer, minsize=_SIDEBAR_PANE_MINSIZE, stretch="never")
-        self._paned.bind("<ButtonRelease-1>", self._persist_sidebar_width)
-        inputs_frame = ctk.CTkScrollableFrame(
-            inputs_outer,
-            width=_SIDEBAR_SCROLL_WIDTH,
+        self._inputs_outer = ctk.CTkFrame(self._paned, corner_radius=12)
+        self._paned.add(self._inputs_outer, minsize=_SIDEBAR_PANE_MINSIZE, stretch="never")
+        self._paned.bind("<ButtonRelease-1>", self._on_paned_interact)
+        self._paned.bind("<B1-Motion>", self._on_paned_interact)
+        self._inputs_outer.bind("<Configure>", self._schedule_sidebar_layout_sync)
+        self._inputs_frame = ctk.CTkScrollableFrame(
+            self._inputs_outer,
+            width=_SIDEBAR_SCROLL_WIDTH_DEFAULT,
             label_text="Your plan",
             corner_radius=12,
             label_font=_ui_font(weight="bold"),
         )
-        inputs_frame.pack(fill="both", expand=True, padx=4, pady=4)
+        self._inputs_frame.pack(fill="both", expand=True, padx=4, pady=4)
+
+        inputs_frame = self._inputs_frame
 
         self._add_section(inputs_frame, "Timeline", [
             ("birth_year", "Birth year"),
@@ -411,15 +475,17 @@ class RetirementPlannerApp(ctk.CTk):
             ("employer_match_up_to_pct_of_salary", "Match on first fraction of salary"),
             ("annual_ira_contribution", "IRA contribution / year"),
         ])
-        ctk.CTkCheckBox(
-            inputs_frame,
-            text="IRA contributions go to Roth",
-            variable=self._ira_roth_var,
-            corner_radius=6,
-            width=_SIDEBAR_OPTION_WIDTH,
-            font=_ui_font(),
-            command=self._schedule_refresh,
-        ).pack(anchor="w", pady=(0, 4), padx=4)
+        self._register_sidebar_option(
+            ctk.CTkCheckBox(
+                inputs_frame,
+                text="IRA contributions go to Roth",
+                variable=self._ira_roth_var,
+                corner_radius=6,
+                width=_SIDEBAR_WRAP_DEFAULT,
+                font=_ui_font(),
+                command=self._schedule_refresh,
+            )
+        ).pack(anchor="w", fill="x", pady=(0, 4), padx=4)
 
         self._add_section(inputs_frame, "Returns (annual, as decimal)", [
             ("annual_return_pre_retirement", "Before retirement"),
@@ -444,62 +510,74 @@ class RetirementPlannerApp(ctk.CTk):
         ])
         wo_frame = ctk.CTkFrame(inputs_frame, corner_radius=12)
         wo_frame.pack(fill="x", pady=(0, 6), padx=4)
-        ctk.CTkLabel(
-            wo_frame,
-            text="Withdrawal order",
-            anchor="w",
-            justify="left",
-            wraplength=_SIDEBAR_WRAP,
-            font=_ui_font(weight="bold"),
-        ).pack(anchor="w", padx=12, pady=(8, 2))
+        self._register_sidebar_wrap(
+            ctk.CTkLabel(
+                wo_frame,
+                text="Withdrawal order",
+                anchor="w",
+                justify="left",
+                wraplength=_SIDEBAR_WRAP_DEFAULT,
+                font=_ui_font(weight="bold"),
+            )
+        ).pack(anchor="w", fill="x", padx=12, pady=(8, 2))
         choice_inner = ctk.CTkFrame(wo_frame, fg_color="transparent")
         choice_inner.pack(fill="x", padx=12, pady=(0, 8))
         for label in WITHDRAWAL_LABELS:
-            ctk.CTkRadioButton(
-                choice_inner,
-                text=label,
-                variable=self._withdrawal_var,
-                value=label,
-                width=_SIDEBAR_OPTION_WIDTH,
-                font=_ui_font(),
-                command=self._schedule_refresh,
+            self._register_sidebar_option(
+                ctk.CTkRadioButton(
+                    choice_inner,
+                    text=label,
+                    variable=self._withdrawal_var,
+                    value=label,
+                    width=_SIDEBAR_WRAP_DEFAULT,
+                    font=_ui_font(),
+                    command=self._schedule_refresh,
+                )
             ).pack(anchor="w", fill="x", pady=3)
 
         adv = ctk.CTkFrame(inputs_frame, corner_radius=12)
         adv.pack(fill="x", pady=(0, 6), padx=4)
-        ctk.CTkLabel(
-            adv,
-            text="Advanced (v2): tax, Roth pools, conversions",
-            anchor="w",
-            justify="left",
-            wraplength=_SIDEBAR_WRAP,
-            font=_ui_font(weight="bold"),
+        self._register_sidebar_wrap(
+            ctk.CTkLabel(
+                adv,
+                text="Advanced (v2): tax, Roth pools, conversions",
+                anchor="w",
+                justify="left",
+                wraplength=_SIDEBAR_WRAP_DEFAULT,
+                font=_ui_font(weight="bold"),
+            )
         ).pack(anchor="w", fill="x", padx=12, pady=(8, 2))
         inner_adv = ctk.CTkFrame(adv, fg_color="transparent")
         inner_adv.pack(fill="x", padx=8, pady=(0, 6))
-        ctk.CTkCheckBox(
-            inner_adv,
-            text="Model federal / state tax, IRMAA (after-tax spending)",
-            variable=self._use_tax_var,
-            width=_SIDEBAR_OPTION_WIDTH,
-            font=_ui_font(),
-            command=self._schedule_refresh,
+        self._register_sidebar_option(
+            ctk.CTkCheckBox(
+                inner_adv,
+                text="Model federal / state tax, IRMAA (after-tax spending)",
+                variable=self._use_tax_var,
+                width=_SIDEBAR_WRAP_DEFAULT,
+                font=_ui_font(),
+                command=self._schedule_refresh,
+            )
         ).pack(anchor="w", fill="x", pady=0)
-        ctk.CTkCheckBox(
-            inner_adv,
-            text="Employee 401(k) deferrals → Roth (post-tax pool)",
-            variable=self._emp_roth_var,
-            width=_SIDEBAR_OPTION_WIDTH,
-            font=_ui_font(),
-            command=self._schedule_refresh,
+        self._register_sidebar_option(
+            ctk.CTkCheckBox(
+                inner_adv,
+                text="Employee 401(k) deferrals → Roth (post-tax pool)",
+                variable=self._emp_roth_var,
+                width=_SIDEBAR_WRAP_DEFAULT,
+                font=_ui_font(),
+                command=self._schedule_refresh,
+            )
         ).pack(anchor="w", fill="x", pady=0)
-        ctk.CTkCheckBox(
-            inner_adv,
-            text="Employer match → Roth (pre-tax pool)",
-            variable=self._match_roth_var,
-            width=_SIDEBAR_OPTION_WIDTH,
-            font=_ui_font(),
-            command=self._schedule_refresh,
+        self._register_sidebar_option(
+            ctk.CTkCheckBox(
+                inner_adv,
+                text="Employer match → Roth (pre-tax pool)",
+                variable=self._match_roth_var,
+                width=_SIDEBAR_WRAP_DEFAULT,
+                font=_ui_font(),
+                command=self._schedule_refresh,
+            )
         ).pack(anchor="w", fill="x", pady=0)
         fil = ctk.CTkFrame(inner_adv, fg_color="transparent")
         fil.pack(fill="x", pady=(2, 0))
@@ -521,10 +599,11 @@ class RetirementPlannerApp(ctk.CTk):
             ("roth_conversion_end_age", "Conversion end age"),
             ("run_monte_carlo_trials", "Monte Carlo trials (0=skip)"),
         ]:
-            entry = LabeledEntry(inner_adv, label)
+            entry = LabeledEntry(inner_adv, label, wrap_labels=self._sidebar_wrap_labels)
             entry.pack(fill="x", pady=0)
             self._fields[key] = entry
 
+        self._schedule_sidebar_layout_sync()
         results_outer = ctk.CTkFrame(self._paned, corner_radius=12, fg_color="transparent")
         self._paned.add(results_outer, minsize=_RESULTS_PANE_MINSIZE, stretch="always")
         self._input_error_label = ctk.CTkLabel(
@@ -550,10 +629,53 @@ class RetirementPlannerApp(ctk.CTk):
         table_tab = self._tabview.add("Year-by-year")
         table_outer = ctk.CTkFrame(table_tab, fg_color="transparent")
         table_outer.pack(fill="both", expand=True, padx=8, pady=8)
+        col_bar = ctk.CTkFrame(table_outer, fg_color="transparent")
+        col_bar.pack(fill="x", pady=(0, 6))
+        ctk.CTkLabel(
+            col_bar,
+            text="Columns (Year and Age stay fixed on the left)",
+            font=_ui_font(),
+            anchor="w",
+        ).pack(anchor="w")
+        col_row = ctk.CTkFrame(col_bar, fg_color="transparent")
+        col_row.pack(fill="x", pady=(4, 0))
+        list_frame = tk.Frame(col_row, borderwidth=0)
+        list_frame.pack(side="left", fill="x", expand=True)
+        table_font = self._ensure_table_tkfont()
+        self._table_col_listbox = tk.Listbox(
+            list_frame,
+            selectmode=tk.EXTENDED,
+            height=4,
+            exportselection=False,
+            font=table_font,
+            activestyle="dotbox",
+        )
+        col_scroll = ttk.Scrollbar(list_frame, orient="vertical", command=self._table_col_listbox.yview)
+        self._table_col_listbox.configure(yscrollcommand=col_scroll.set)
+        self._table_col_listbox.pack(side="left", fill="x", expand=True)
+        col_scroll.pack(side="left", fill="y")
+        self._table_col_listbox.bind("<<ListboxSelect>>", self._on_table_columns_changed)
+        btn_col = ctk.CTkFrame(col_row, fg_color="transparent")
+        btn_col.pack(side="left", padx=(8, 0))
+        ctk.CTkButton(
+            btn_col,
+            text="All",
+            width=56,
+            font=_ui_font(),
+            command=self._select_all_table_columns,
+            **_TOOLBAR_SECONDARY_BTN,
+        ).pack(pady=(0, 4))
+        ctk.CTkButton(
+            btn_col,
+            text="None",
+            width=56,
+            font=_ui_font(),
+            command=self._select_no_table_columns,
+            **_TOOLBAR_SECONDARY_BTN,
+        ).pack()
         grid = tk.Frame(table_outer, borderwidth=0, highlightthickness=0)
         grid.pack(fill="both", expand=True)
 
-        table_font = self._ensure_table_tkfont()
         text_kw: dict[str, Any] = {
             "font": table_font,
             "wrap": "none",
@@ -731,18 +853,20 @@ class RetirementPlannerApp(ctk.CTk):
     def _add_section(self, parent: ctk.CTkScrollableFrame, title: str, rows: list[tuple[str, str]]) -> None:
         frame = ctk.CTkFrame(parent, corner_radius=12)
         frame.pack(fill="x", pady=(0, 6), padx=4)
-        ctk.CTkLabel(
-            frame,
-            text=title,
-            anchor="w",
-            justify="left",
-            wraplength=_SIDEBAR_WRAP,
-            font=_ui_font(weight="bold"),
+        self._register_sidebar_wrap(
+            ctk.CTkLabel(
+                frame,
+                text=title,
+                anchor="w",
+                justify="left",
+                wraplength=_SIDEBAR_WRAP_DEFAULT,
+                font=_ui_font(weight="bold"),
+            )
         ).pack(anchor="w", fill="x", padx=12, pady=(8, 2))
         inner = ctk.CTkFrame(frame, fg_color="transparent")
         inner.pack(fill="x", padx=8, pady=(0, 6))
         for key, label in rows:
-            entry = LabeledEntry(inner, label)
+            entry = LabeledEntry(inner, label, wrap_labels=self._sidebar_wrap_labels)
             entry.pack(fill="x", pady=0)
             self._fields[key] = entry
 
@@ -768,8 +892,8 @@ class RetirementPlannerApp(ctk.CTk):
         self._schedule_refresh()
 
     def collect_inputs(self) -> RetirementInputs:
-        wo = WITHDRAWAL_LABELS.get(self._withdrawal_var.get(), WithdrawalOrder.TAXABLE_TRADITIONAL_ROTH)
-        return RetirementInputs(
+        wo = withdrawal_order_from_label(self._withdrawal_var.get())
+        return build_retirement_inputs(
             birth_year=_parse_int(self._fields["birth_year"].var.get(), "Birth year"),
             planning_start_year=_parse_int(self._fields["planning_start_year"].var.get(), "Planning start year"),
             retirement_age=_parse_int(self._fields["retirement_age"].var.get(), "Retirement age"),
@@ -812,7 +936,7 @@ class RetirementPlannerApp(ctk.CTk):
             withdrawal_order=wo,
             use_tax_modeling=self._use_tax_var.get(),
             filing_status=self._filing_var.get(),
-            state_code=self._fields["state_code"].var.get().strip() or "none",
+            state_code=self._fields["state_code"].var.get(),
             state_custom_tax_rate=_parse_float(
                 self._fields["state_custom_tax_rate"].var.get(), "State tax rate"
             ),
@@ -898,10 +1022,46 @@ class RetirementPlannerApp(ctk.CTk):
                     )
                 )
 
+    def _sync_table_column_listbox(self, options: list[str]) -> None:
+        if not self._table_col_listbox:
+            return
+        current = list(self._table_col_listbox.get(0, tk.END))
+        if current == options:
+            return
+        prior_selected = set(self._selected_table_scroll_columns())
+        self._table_col_listbox.delete(0, tk.END)
+        for index, name in enumerate(options):
+            self._table_col_listbox.insert(tk.END, name)
+            if not current or name in prior_selected:
+                self._table_col_listbox.selection_set(index)
+
+    def _selected_table_scroll_columns(self) -> list[str]:
+        if not self._table_col_listbox:
+            return []
+        return [self._table_col_listbox.get(i) for i in self._table_col_listbox.curselection()]
+
+    def _on_table_columns_changed(self, _event: tk.Event | None = None) -> None:
+        if self._df is not None:
+            self._refresh_table(self._df)
+
+    def _select_all_table_columns(self) -> None:
+        if not self._table_col_listbox:
+            return
+        self._table_col_listbox.selection_set(0, tk.END)
+        self._on_table_columns_changed()
+
+    def _select_no_table_columns(self) -> None:
+        if not self._table_col_listbox:
+            return
+        self._table_col_listbox.selection_clear(0, tk.END)
+        self._on_table_columns_changed()
+
     def _refresh_table(self, df: pd.DataFrame) -> None:
         if not self._table_fixed or not self._table_scroll:
             return
-        fixed_text, scroll_text = _format_yearly_table_parts(df)
+        table = report_dataframe(df)
+        self._sync_table_column_listbox(yearly_scroll_column_names(table))
+        fixed_text, scroll_text = format_yearly_table_parts(df, self._selected_table_scroll_columns())
         for widget, content in ((self._table_fixed, fixed_text), (self._table_scroll, scroll_text)):
             widget.configure(state="normal")
             widget.delete("1.0", "end")
