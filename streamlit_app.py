@@ -17,6 +17,7 @@ from retirement.report import (
     YEARLY_FIXED_LABELS,
     build_html_report,
     report_dataframe,
+    report_bundle_zip_bytes,
     summarize_projection,
     workbook_bytes,
     yearly_scroll_column_names,
@@ -440,6 +441,18 @@ def main() -> None:
 
     with tab_export:
         st.subheader("Download")
+        zip_bytes = report_bundle_zip_bytes(df, inputs)
+        st.download_button(
+            "Download all (ZIP)",
+            data=zip_bytes,
+            file_name="retirement_export.zip",
+            mime="application/zip",
+            type="primary",
+            use_container_width=True,
+            help="CSV, HTML, Excel, and chart PNGs (same set as the desktop Export all).",
+        )
+        st.caption("ZIP contains retirement_projection.csv, retirement_report.html, retirement_planner.xlsx, and charts/*.png")
+
         col_a, col_b, col_c = st.columns(3)
         csv_bytes = report_dataframe(df).to_csv(index=False).encode("utf-8")
         html_bytes = build_html_report(df, inputs).encode("utf-8")

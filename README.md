@@ -53,7 +53,7 @@ python gui.py
 
 ## Streamlit app (optional)
 
-Browser-based UI with the same exports:
+Browser-based UI with the same exports (individual downloads or **Download all (ZIP)** on **Save & print**):
 
 ```powershell
 .\run-streamlit.ps1

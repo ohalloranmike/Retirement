@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import html
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -210,7 +211,6 @@ def build_html_report(df: pd.DataFrame, inputs: RetirementInputs) -> str:
 
 def workbook_bytes(inputs: RetirementInputs) -> bytes:
     import tempfile
-    from pathlib import Path
 
     from retirement.excel_export import create_workbook
 
@@ -251,3 +251,20 @@ def export_report_bundle(directory: Path, df: pd.DataFrame, inputs: RetirementIn
     chart_dir = directory / "charts"
     written.extend(save_charts(df, chart_dir))
     return written
+
+
+def report_bundle_zip_bytes(df: pd.DataFrame, inputs: RetirementInputs) -> bytes:
+    """Same files as export_report_bundle, packaged for browser download."""
+    import io
+    import tempfile
+    import zipfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp) / "retirement_export"
+        paths = export_report_bundle(root, df, inputs)
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for path in paths:
+                arcname = path.relative_to(root).as_posix()
+                zf.write(path, arcname)
+        return buf.getvalue()

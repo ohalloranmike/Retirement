@@ -114,13 +114,15 @@ Same **Your plan** fields as the desktop GUI (including **Advanced (v2)**), buil
 
 **Sidebar:** expanders match the desktop sections; the sidebar width follows the browser like Streamlit’s built-in layout.
 
+**Save & print:** **Download all (ZIP)** packages CSV, HTML, Excel, and chart PNGs (same contents as the desktop **Export all** folder). Individual CSV, Excel, and HTML buttons remain below the ZIP control.
+
 ### 3.4 Excel export (GUI / Streamlit only)
 
 Excel is an **output format**, not a way to drive the model from the command line.
 
 - **Desktop:** **File → Export Excel workbook…** (or **Save & print → Download Excel**).
-- **Streamlit:** **Save & print → Download Excel** (default name `retirement_planner.xlsx`).
-- **Export all** (GUI folder bundle) also writes Excel alongside CSV, HTML, and charts.
+- **Streamlit:** **Save & print → Download Excel** (default name `retirement_planner.xlsx`), or **Download all (ZIP)** for CSV, HTML, Excel, and chart PNGs.
+- **Export all** (GUI) writes the same files into a folder you choose; Streamlit delivers the same set as a ZIP download.
 
 Each exported file includes:
 
@@ -376,7 +378,7 @@ Code: `retirement/roth_pools.py`, integrated in `retirement/projection.py`.
 | **Excel** | GUI/Streamlit export: Inputs snapshot + Projection sheet |
 | **HTML** | Summary, assumptions, embedded charts, full table — good for print/PDF |
 | **PNG charts** | Income-by-source vs spending; total balance over time |
-| **Export all** (GUI) | CSV + HTML + Excel + charts in one folder |
+| **Export all** | GUI: folder; Streamlit: **Download all (ZIP)** — CSV + HTML + Excel + chart PNGs |
 
 ---
 
@@ -423,7 +425,7 @@ Load: `python main.py --config config\sample.json --summary`
 | `retirement/roth_pools.py` | Roth post-tax / pre-tax pools |
 | `retirement/tax/` | Federal, state, SS tax, IRMAA |
 | `retirement/monte_carlo.py` | Trial success rate |
-| `retirement/report.py` | `report_dataframe`, HTML/CSV export, `format_yearly_table_parts`, column labels |
+| `retirement/report.py` | `report_dataframe`, HTML/CSV/Excel export, `export_report_bundle`, `report_bundle_zip_bytes`, `format_yearly_table_parts` |
 | `retirement/excel_export.py` | Build Excel files for GUI/Streamlit export |
 | `gui.py` / `streamlit_app.py` / `main.py` | Entry points |
 | `retirement/gui_theme.py` | Desktop GUI fonts and ttk/Sun Valley theme |
