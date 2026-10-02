@@ -1,6 +1,6 @@
 # Retirement Planner — features and user guide
 
-Single reference for **what this tool does**, **v1 and v2 behavior**, and **how to run it**. For install commands only, see [README.md](../README.md).
+Single reference for **what this tool does**, **v1 and v2 behavior**, and **how to run it**. For install on this machine see [README.md](../README.md). To **clone and update on another Windows PC** (Git + `.venv`), see [setup+git.md](setup+git.md).
 
 **Disclaimer:** Educational cash-flow modeling only. Not investment, tax, or legal advice. Confirm Social Security estimates with [SSA.gov](https://www.ssa.gov), pension amounts with your plan, and tax rules with a qualified professional.
 

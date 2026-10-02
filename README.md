@@ -78,6 +78,7 @@ Excel workbooks are **exports only** — use the **desktop GUI** (**File → Exp
 
 ## Documentation
 
+- **[docs/setup+git.md](docs/setup+git.md)** — clone on another Windows PC, `.venv` setup, `git pull` to stay updated
 - **[docs/features.md](docs/features.md)** — complete v1/v2 features, inputs, Roth pools, exports, limitations, troubleshooting
 - `config/sample.json` — basic plan
 - `config/sample_v2.json` — tax, Roth pools, conversions, Monte Carlo
